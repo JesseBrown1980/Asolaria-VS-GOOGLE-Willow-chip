@@ -31,7 +31,7 @@ h1{margin:0;font-size:20px;letter-spacing:2px}h1 b{color:var(--cy)}h1 .os{color:
 .screen{flex:1;background:#000;overflow:auto;padding:10px 12px;white-space:pre-wrap;word-break:break-word;font-size:12.5px;color:#d6e2f5;min-height:0}
 .screen .none{color:var(--dim)}
 .winpane{flex:1;min-height:0;display:flex;flex-direction:column;background:#000}.winpane[hidden]{display:none}
-.winbar{padding:4px 10px;font-size:11px;color:var(--dim);border-bottom:1px solid var(--ln)}.winbar b{color:var(--warn)}
+.winbar a{color:var(--cy)}.winbar{padding:4px 10px;font-size:11px;color:var(--dim);border-bottom:1px solid var(--ln)}.winbar b{color:var(--warn)}
 .winpane img{flex:1;min-height:0;width:100%;object-fit:contain;user-select:none;pointer-events:none}
 .inrow{display:flex;gap:8px;padding:8px 10px;border-top:1px solid var(--ln);background:#0a0f1c;align-items:center}
 .inrow .p{color:var(--gn)}
@@ -72,7 +72,7 @@ footer .fire{color:var(--gn)}
     <button class="btn rd" onclick="killActive()">kill</button>
    </div>
    <div class=tabs id=tabs></div>
-   <div class=winpane id=winpane hidden><div class=winbar>🪟 Windows · <b>view-only</b> · <span id=winstat>connecting…</span></div><img id=winimg alt="Windows desktop (view-only)"></div>
+   <div class=winpane id=winpane hidden><div class=winbar>🪟 Windows · <b>view-only</b> · source <a href="#" id=winsrc onclick="winSrc(event)">capture</a> · <span id=winstat>connecting…</span></div><img id=winimg alt="Windows desktop (view-only)"></div>
    <div class=screen id=screen><span class=none>No terminal open. Click <b>+ cmd</b> / <b>+ PowerShell</b> / <b>+ WSL bash</b> to open a real shell on the live system, then type — including <b>claude</b> and <b>codex</b>.</span></div>
    <div class=inrow><span class=p>❯</span><input id=cmd placeholder="type into the active terminal — Enter to send (Shift+Enter = raw newline)" autocomplete=off spellcheck=false></div>
   </div>
@@ -127,17 +127,26 @@ function render(){ const t=terms[active]; if(!t){screenEl.innerHTML='<span class
 async function send(data){ if(!active) return; await fetch('/term/input?id='+active,{method:'POST',body:data}); }
 async function killTerm(id){ await fetch('/term/kill?id='+id,{method:'POST'}); if(terms[id]){terms[id].es&&terms[id].es.close(); delete terms[id];} if(active===id){active=Object.keys(terms)[0]?+Object.keys(terms)[0]:null;} renderTabs(); render(); }
 function killActive(){ if(active) killTerm(active); }
-let winOn=false, winUrl=null;
+let winOn=false, winUrl=null, winFrom='capture';
+/* source: "capture" = this server grabs the desktop itself (always current);
+   "projector" = the external projector loop's last frame, labelled LIVE or STALE with its age */
+function winSrc(e){ e.preventDefault(); winFrom = winFrom==='capture' ? 'projector' : 'capture'; $('#winsrc').textContent=winFrom; }
 function winClick(e){ if(e.shiftKey){ winLaunch(); return; } winOn=!winOn; $('#winpane').hidden=!winOn; screenEl.hidden=winOn; if(winOn) winLoop(); }
 async function winLoop(){
   if(!winOn) return;
   const w=Math.max(320,Math.min(1920,Math.round($('#winpane').clientWidth*(window.devicePixelRatio||1))));
   try{
-    const r=await fetch('/win/screen.bmp?w='+w,{cache:'no-store'});
-    if(r.ok){ const u=URL.createObjectURL(await r.blob()); $('#winimg').src=u; if(winUrl) URL.revokeObjectURL(winUrl); winUrl=u; $('#winstat').textContent='live · '+w+'px wide'; }
-    else $('#winstat').textContent='no frame ('+r.status+')';
+    let label='';
+    if(winFrom==='projector'){
+      const st=await (await fetch('/win/state.hbp',{cache:'no-store'})).text();
+      const m=/status=([A-Z-]+)(?:\|age_s=(\d+))?/.exec(st);
+      label = m ? ('projector '+m[1]+(m[2]!==undefined?' · '+m[2]+' s old':'')) : 'projector: no state';
+    }
+    const r=await fetch(winFrom==='capture' ? '/win/screen.bmp?w='+w : '/win/frame.jpg', {cache:'no-store'});
+    if(r.ok){ const u=URL.createObjectURL(await r.blob()); $('#winimg').src=u; if(winUrl) URL.revokeObjectURL(winUrl); winUrl=u; $('#winstat').textContent = winFrom==='capture' ? ('live capture · '+w+'px wide') : label; }
+    else $('#winstat').textContent=(label?label+' · ':'')+'no frame ('+r.status+')';
   }catch(e){ $('#winstat').textContent='no frame'; }
-  setTimeout(winLoop,400);
+  setTimeout(winLoop, winFrom==='capture' ? 400 : 1200);
 }
 async function winLaunch(){ try{ const r=await (await fetch('/win/launch',{method:'POST'})).text(); }catch(e){} }
 cmdEl.addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); const v=cmdEl.value; cmdEl.value=''; send(v+'\r\n'); } });
