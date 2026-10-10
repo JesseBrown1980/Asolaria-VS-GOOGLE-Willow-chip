@@ -18,6 +18,10 @@ use std::sync::OnceLock;
 pub const BODY_MAX: usize = 1 << 20;
 /// Live terminal sessions allowed at once.
 pub const SESSIONS_MAX: usize = 32;
+/// Open HTTP connections allowed at once; excess connections are closed on accept.
+pub const CONN_MAX: usize = 256;
+/// Read/write timeout on every accepted connection (the event stream lifts the read side).
+pub const IO_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 
 /// Fill `buf` from the operating system's CSPRNG.
 #[cfg(windows)]

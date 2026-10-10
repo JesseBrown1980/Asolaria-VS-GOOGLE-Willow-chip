@@ -45,13 +45,34 @@ fn main() {
     let listener = TcpListener::bind(&bind).unwrap_or_else(|e| panic!("bind {bind}: {e}"));
     println!("ASOLARIA ASI OS front-end — live on http://{bind}  (Rust std, 0 deps)");
     for stream in listener.incoming().flatten() {
+        // bounded: past CONN_MAX open connections a new one is closed at once, so a flood of
+        // idle sockets cannot pin unbounded threads
+        if OPEN_CONNS.fetch_add(1, std::sync::atomic::Ordering::SeqCst) >= guard::CONN_MAX {
+            OPEN_CONNS.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+            drop(stream);
+            continue;
+        }
         thread::spawn(move || {
+            let _slot = ConnSlot;
             let _ = handle(stream);
         });
     }
 }
 
+static OPEN_CONNS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// Releases one connection slot when the handler thread ends, however it ends.
+struct ConnSlot;
+impl Drop for ConnSlot {
+    fn drop(&mut self) {
+        OPEN_CONNS.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
 fn handle(mut stream: TcpStream) -> std::io::Result<()> {
+    // a client that trickles its request (or never reads its answer) is cut after IO_TIMEOUT
+    stream.set_read_timeout(Some(guard::IO_TIMEOUT))?;
+    stream.set_write_timeout(Some(guard::IO_TIMEOUT))?;
     let peer = stream.try_clone()?;
     let mut reader = BufReader::new(peer);
 
@@ -185,7 +206,16 @@ fn handle(mut stream: TcpStream) -> std::io::Result<()> {
             term::kill(query_id(&query));
             write_resp(&mut stream, 200, "text/plain", b"ok")
         }
-        ("GET", "/term/stream") => term::stream(stream, query_id(&query)),
+        // The token arrives as `t=` in the query here, not as a header, because the browser's
+        // EventSource API cannot set request headers. It is accepted from the query on this one
+        // route only (the guard above passes "" as the query for every other path), and every
+        // response carries `Referrer-Policy: no-referrer` so the URL cannot leak it onward.
+        ("GET", "/term/stream") => {
+            // the guard passed: this is a long-lived event stream that only writes, so the read
+            // timeout is lifted; the write timeout stays, so a client that stops reading is cut
+            stream.set_read_timeout(None)?;
+            term::stream(stream, query_id(&query))
+        }
         // --- the backend office, read-only: rendered dashboard + the parallel ASI OS screen ---
         ("GET", "/dashboard") => match office_file("fable5-dashboard.html") {
             Some(b) => write_resp(&mut stream, 200, "text/html; charset=utf-8", &b),
