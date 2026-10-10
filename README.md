@@ -12,7 +12,9 @@ declared as `rust-version = "1.81"` in every `Cargo.toml`, and enforced in CI by
 Any receipt in this repository naming a toolchain other than 1.81 records a run made outside
 the rule. It is retained as history, not as the toolchain of record.
 
-A tiny, self-contained **operating-system front-end** you build from source and run on your own machine — the same surface the Asolaria fabric runs on. Pure Rust `std`, **zero external crates**, ~400 lines. It serves a full-screen web UI on `http://127.0.0.1:4600` with real interactive shells, a live status strip for your local fabric, and a "Windows-as-a-window" tile.
+A tiny, self-contained **operating-system front-end** you build from source and run on your own machine — the same surface the Asolaria fabric runs on. Pure Rust `std`, **zero external crates**. It serves a full-screen **desktop** on `http://127.0.0.1:4600`: a wallpaper and icon grid, movable/resizable windows (snap to halves, maximize, minimize), a taskbar with a Start menu (Win key, Alt+S, or just type on the desktop), and a tray showing your local fabric's live status.
+
+Apps, each in its own window: **Command Prompt / PowerShell / WSL Bash** (real shells, one per window), **Claude** and **Codex** (run in a shell), **System Monitor**, **Kernel** (host8 `:5088` rows), **Recall Search** (your local HILBRA vault, proxied read-only through `/api/recall`), **Files** (read-only browser of the backend office via `/fs/list` and `/fs/read`: no `..`, no absolute paths, symlink escapes refused, text files ≤ 1 MiB), **Dashboard**, **ASI OS Screen**, **Windows View** (view-only), **Settings** (theme, wallpaper, icon size, accent) and **About**.
 
 You become an **Asolaria fabric participant**: you mint your **own local secret key** (it never leaves your machine), run the OS surface, and — as you bring up the fabric daemons — use **Hilbra** (the shared-key HBI/HBP layer), **recall** (a local inverted-index vault), and the **8-byte-host** kernel with its stubbed rooms, exactly like a full node.
 

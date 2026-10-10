@@ -1,154 +1,543 @@
-<!doctype html><html lang=en translate=no><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>ASOLARIA ASI OS</title>
+<!doctype html><html lang=en translate=no><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Asolaria ASI OS</title>
 <style>
-:root{--bg:#05070d;--pnl:#0b1120;--pnl2:#0e1626;--ln:#18233c;--ln2:#26344f;--cy:#43e8d8;--am:#ffb454;--vi:#a78bfa;--gn:#5ce0a0;--rd:#ff6b6b;--dim:#5c6c88;--tx:#cddaf2}
-*{box-sizing:border-box}html,body{margin:0;height:100%}
-body{background:radial-gradient(1100px 560px at 80% -12%,#12203c,rgba(5,7,13,0) 60%),var(--bg);color:var(--tx);font:13px/1.45 ui-monospace,"Cascadia Code",Consolas,monospace;font-variant-numeric:tabular-nums;display:flex;flex-direction:column;height:100vh;overflow:hidden}
-header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 18px;border-bottom:1px solid var(--ln);background:linear-gradient(90deg,#0a1424,#0a0f1c)}
-h1{margin:0;font-size:20px;letter-spacing:2px}h1 b{color:var(--cy)}h1 .os{color:var(--am)}
-.meta{color:var(--dim);font-size:11px;text-align:right;line-height:1.6}.meta b{color:var(--tx)}.meta .fire{color:var(--gn)}
-.wrap{flex:1;display:grid;grid-template-columns:300px 1fr;gap:14px;padding:14px;min-height:0}
-@media(max-width:760px){.wrap{grid-template-columns:1fr;grid-template-rows:auto 1fr}}
-.col{min-height:0;display:flex;flex-direction:column;gap:12px}
-.sect{color:var(--dim);font-size:10px;letter-spacing:2px;text-transform:uppercase;margin:2px 0}
-.tiles{display:flex;flex-direction:column;gap:10px;overflow:auto}
-.tile{background:var(--pnl);border:1px solid var(--ln);border-left:3px solid var(--ln2);border-radius:9px;padding:9px 12px}
-.tile.up{border-left-color:var(--gn)}.tile.down{border-left-color:var(--rd)}
-.tile .r1{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.tile .nm{color:var(--tx);font-weight:600}.tile .nm small{color:var(--dim);font-weight:400}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--dim);box-shadow:0 0 8px transparent}
-.dot.up{background:var(--gn);box-shadow:0 0 9px var(--gn)}.dot.down{background:var(--rd);box-shadow:0 0 9px var(--rd)}
-.tile .sub{color:var(--dim);font-size:11px;margin-top:3px;word-break:break-all}
-.tile .sub b{color:var(--cy)}
-.term{flex:1;display:flex;flex-direction:column;min-height:0;background:var(--pnl);border:1px solid var(--ln);border-radius:10px;overflow:hidden}
-.tbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 10px;border-bottom:1px solid var(--ln);background:#0a0f1c}
-.btn{background:#111a2e;border:1px solid var(--ln2);color:var(--tx);border-radius:7px;padding:4px 10px;font:inherit;font-size:12px;cursor:pointer}
-.btn:hover{border-color:var(--cy);color:var(--cy)}
-.btn.am:hover{border-color:var(--am);color:var(--am)}.btn.rd:hover{border-color:var(--rd);color:var(--rd)}.btn.vi:hover{border-color:var(--vi);color:var(--vi)}
-.tabs{display:flex;gap:2px;padding:4px 8px 0;overflow-x:auto}
-.tab{background:#0a0f1c;border:1px solid var(--ln);border-bottom:none;border-radius:7px 7px 0 0;padding:4px 12px;color:var(--dim);cursor:pointer;white-space:nowrap;font-size:12px}
-.tab.active{color:var(--cy);border-color:var(--ln2);background:#000}
-.tab .x{color:var(--dim);margin-left:8px}.tab .x:hover{color:var(--rd)}
-.screen{flex:1;background:#000;overflow:auto;padding:10px 12px;white-space:pre-wrap;word-break:break-word;font-size:12.5px;color:#d6e2f5;min-height:0}
-.screen .none{color:var(--dim)}
-.winpane{flex:1;min-height:0;display:flex;flex-direction:column;background:#000}.winpane[hidden]{display:none}
-.winbar a{color:var(--cy)}.winbar{padding:4px 10px;font-size:11px;color:var(--dim);border-bottom:1px solid var(--ln)}.winbar b{color:var(--warn)}
-.winpane img{flex:1;min-height:0;width:100%;object-fit:contain;user-select:none;pointer-events:none}
-.inrow{display:flex;gap:8px;padding:8px 10px;border-top:1px solid var(--ln);background:#0a0f1c;align-items:center}
-.inrow .p{color:var(--gn)}
-.inrow input{flex:1;background:#000;border:1px solid var(--ln2);border-radius:7px;color:var(--tx);font:inherit;padding:6px 10px}
-.inrow input:focus{outline:none;border-color:var(--cy)}
-footer{color:var(--dim);font-size:10.5px;padding:7px 18px;border-top:1px solid var(--ln);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
-footer .fire{color:var(--gn)}
-.hint{color:var(--dim);font-size:11px}
+:root{--ac:#43e8d8;--ac2:#a78bfa;--am:#ffb454;--gn:#5ce0a0;--rd:#ff6b6b;
+ --bg:#060a14;--glass:rgba(16,22,38,.78);--glass2:rgba(20,27,46,.97);--win:#0d1322;--winhd:#121a2d;--ln:rgba(140,170,220,.16);--ln2:rgba(140,170,220,.28);
+ --tx:#e6edf9;--tx2:#9aa8c3;--dim:#64738f;--sh:0 18px 50px rgba(0,0,0,.55),0 2px 8px rgba(0,0,0,.4);--ico:56px;--r:12px;
+ --ui:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;--mono:"Cascadia Mono","Cascadia Code",Consolas,ui-monospace,monospace}
+body.light{--bg:#dfe7f3;--glass:rgba(250,252,255,.8);--glass2:rgba(255,255,255,.95);--win:#f7f9fc;--winhd:#eef2f8;--ln:rgba(40,60,100,.14);--ln2:rgba(40,60,100,.24);--tx:#16203a;--tx2:#46557a;--dim:#7a88a6;--sh:0 18px 50px rgba(30,50,90,.25),0 2px 8px rgba(30,50,90,.15)}
+*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--tx);font:13.5px/1.45 var(--ui);user-select:none;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit}
+input,textarea,select{font:inherit;color:var(--tx)}
+::selection{background:rgba(67,232,216,.35)}
+/* ---------- wallpaper ---------- */
+#wall{position:fixed;inset:0;z-index:0;overflow:hidden}
+#wall.cube{background:radial-gradient(1200px 700px at 78% 8%,rgba(64,90,200,.38),transparent 60%),radial-gradient(900px 600px at 10% 95%,rgba(150,80,220,.30),transparent 60%),radial-gradient(700px 500px at 55% 60%,rgba(40,200,190,.12),transparent 70%),linear-gradient(160deg,#081022,#05070f 60%,#0a0718)}
+#wall.aurora{background:radial-gradient(1000px 500px at 20% 15%,rgba(60,230,200,.35),transparent 60%),radial-gradient(1000px 600px at 85% 30%,rgba(140,90,250,.40),transparent 60%),radial-gradient(900px 500px at 50% 100%,rgba(255,170,80,.22),transparent 60%),linear-gradient(180deg,#071024,#0b0820)}
+#wall.dusk{background:radial-gradient(1100px 600px at 50% 110%,rgba(255,140,90,.45),transparent 60%),radial-gradient(900px 500px at 30% 0%,rgba(90,70,200,.45),transparent 60%),linear-gradient(180deg,#120a2a,#1d0f2a 55%,#3a1a2a)}
+#wall.plain{background:linear-gradient(160deg,#0c1426,#070a14)}
+body.light #wall.cube{background:radial-gradient(1100px 700px at 78% 8%,rgba(120,150,255,.45),transparent 60%),radial-gradient(900px 600px at 10% 95%,rgba(190,140,255,.35),transparent 60%),linear-gradient(160deg,#eef3fb,#d7e1f1)}
+body.light #wall.aurora{background:radial-gradient(1000px 500px at 20% 15%,rgba(60,230,200,.35),transparent 60%),radial-gradient(1000px 600px at 85% 30%,rgba(140,90,250,.35),transparent 60%),linear-gradient(180deg,#c9d8ef,#b8c4e6)}
+body.light #wall.dusk{background:radial-gradient(1100px 600px at 50% 110%,rgba(255,150,100,.55),transparent 60%),linear-gradient(180deg,#a9b3e0,#d9b3c4)}
+body.light #wall.plain{background:linear-gradient(160deg,#eef3fb,#d5deee)}
+#wall svg.hero{position:absolute;right:7%;top:50%;transform:translateY(-58%);width:min(38vw,520px);height:auto;opacity:.62;filter:drop-shadow(0 30px 60px rgba(0,0,0,.45))}
+#wall .mark{position:absolute;right:6%;bottom:72px;text-align:right;color:rgba(230,240,255,.55);letter-spacing:.38em;font:600 13px var(--ui)}
+#wall .mark b{display:block;font-size:30px;letter-spacing:.32em;color:rgba(235,245,255,.82);font-weight:300}
+body.light #wall .mark{color:rgba(30,40,70,.5)}body.light #wall .mark b{color:rgba(30,40,70,.7)}
+/* ---------- desktop icons ---------- */
+#desk{position:fixed;left:0;top:0;right:0;bottom:52px;z-index:1;padding:14px 10px;display:grid;grid-auto-flow:column;grid-template-rows:repeat(auto-fill,calc(var(--ico) + 44px));grid-auto-columns:calc(var(--ico) + 44px);gap:4px 6px;align-content:start}
+.dico{display:flex;flex-direction:column;align-items:center;gap:5px;padding:7px 4px 5px;border-radius:10px;border:1px solid transparent;cursor:default;outline:none}
+.dico svg{width:var(--ico);height:var(--ico);filter:drop-shadow(0 6px 10px rgba(0,0,0,.35));transition:transform .12s}
+.dico:hover{background:rgba(255,255,255,.07)}.dico:hover svg{transform:translateY(-1px)}
+.dico.sel{background:rgba(67,232,216,.16);border-color:rgba(67,232,216,.45)}
+body.light .dico span{background:rgba(15,25,50,.42);border-radius:6px;padding:0 6px}
+.dico span{font-size:12px;color:#fff;text-align:center;line-height:1.2;text-shadow:0 1px 3px rgba(0,0,0,.85),0 0 8px rgba(0,0,0,.5);max-width:100%;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+
+/* ---------- windows ---------- */
+#wins{position:fixed;inset:0 0 52px 0;z-index:2;pointer-events:none}
+.win{position:absolute;display:flex;flex-direction:column;background:var(--win);border:1px solid var(--ln2);border-radius:var(--r);box-shadow:var(--sh);pointer-events:auto;min-width:300px;min-height:180px;overflow:hidden;animation:pop .14s ease-out}
+@keyframes pop{from{transform:scale(.96);opacity:0}to{transform:none;opacity:1}}
+.win.inactive{box-shadow:0 10px 30px rgba(0,0,0,.35)}.win.inactive .tb{opacity:.78}
+.win.max{border-radius:0;border-width:0}
+.win.min{display:none}
+.tb{display:flex;align-items:center;gap:9px;height:38px;padding:0 4px 0 12px;background:var(--winhd);border-bottom:1px solid var(--ln);flex:none;cursor:default}
+.tb svg{width:18px;height:18px;flex:none}
+.tb .tt{flex:1;font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tb .tt small{font-weight:400;color:var(--dim);margin-left:6px}
+.tb .wb{width:40px;height:30px;border:0;background:none;border-radius:7px;display:grid;place-items:center;color:var(--tx2);cursor:pointer}
+.tb .wb:hover{background:rgba(140,170,220,.14);color:var(--tx)}.tb .wb.x:hover{background:#e0464f;color:#fff}
+.tb .wb svg{width:12px;height:12px}
+.wbody{flex:1;min-height:0;display:flex;flex-direction:column;position:relative;user-select:text}
+.rz{position:absolute;z-index:3}.rz.n{top:-3px;left:8px;right:8px;height:7px;cursor:ns-resize}.rz.s{bottom:-3px;left:8px;right:8px;height:7px;cursor:ns-resize}
+.rz.e{right:-3px;top:8px;bottom:8px;width:7px;cursor:ew-resize}.rz.w{left:-3px;top:8px;bottom:8px;width:7px;cursor:ew-resize}
+.rz.ne{right:-3px;top:-3px;width:12px;height:12px;cursor:nesw-resize}.rz.nw{left:-3px;top:-3px;width:12px;height:12px;cursor:nwse-resize}
+.rz.se{right:-3px;bottom:-3px;width:14px;height:14px;cursor:nwse-resize}.rz.sw{left:-3px;bottom:-3px;width:12px;height:12px;cursor:nesw-resize}
+.win.max .rz{display:none}
+#ghost{position:fixed;z-index:1;border-radius:12px;background:rgba(67,232,216,.12);border:2px solid rgba(67,232,216,.6);pointer-events:none;display:none;transition:all .1s}
+#shield{position:fixed;inset:0;z-index:9;display:none}
+/* ---------- taskbar ---------- */
+#bar{position:fixed;left:0;right:0;bottom:0;height:52px;z-index:5;display:flex;align-items:center;gap:6px;padding:0 10px;background:var(--glass);backdrop-filter:blur(22px) saturate(1.4);border-top:1px solid var(--ln)}
+#startb{height:40px;padding:0 12px 0 8px;border:0;border-radius:9px;background:none;display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;letter-spacing:.06em}
+#startb svg{width:28px;height:28px}#startb:hover,#startb.on{background:rgba(140,170,220,.14)}
+#tasks{flex:1;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;min-width:0}
+.task{height:40px;max-width:200px;min-width:44px;display:flex;align-items:center;gap:8px;padding:0 12px 0 10px;border:0;border-radius:9px;background:none;cursor:pointer;position:relative;white-space:nowrap}
+.task svg{width:22px;height:22px;flex:none}.task span{overflow:hidden;text-overflow:ellipsis;font-size:12.5px}
+.task:hover{background:rgba(140,170,220,.12)}
+.task.on{background:rgba(140,170,220,.18)}
+.task::after{content:"";position:absolute;bottom:3px;left:50%;transform:translateX(-50%);width:6px;height:3px;border-radius:3px;background:var(--dim)}
+.task.on::after{width:18px;background:var(--ac)}
+#tray{display:flex;align-items:center;gap:10px;padding:0 4px 0 10px;height:40px}
+.svc{display:flex;gap:5px;align-items:center;padding:6px 9px;border-radius:9px;cursor:pointer}.svc:hover{background:rgba(140,170,220,.12)}
+.svc i{width:8px;height:8px;border-radius:50%;background:var(--dim)}.svc i.up{background:var(--gn);box-shadow:0 0 7px var(--gn)}.svc i.down{background:var(--rd);box-shadow:0 0 7px var(--rd)}.svc i.np,.svc i.slow{background:var(--am)}
+.e0{font:600 10.5px var(--mono);color:var(--gn);border:1px solid rgba(92,224,160,.45);border-radius:6px;padding:2px 6px;letter-spacing:.05em}
+#clock{text-align:right;line-height:1.25;font-size:12px;padding:4px 8px;border-radius:9px;cursor:default;font-variant-numeric:tabular-nums}
+#clock:hover{background:rgba(140,170,220,.12)}#clock small{color:var(--tx2);display:block;font-size:11px}
+/* ---------- start menu ---------- */
+#start{position:fixed;left:10px;bottom:60px;z-index:8;width:min(560px,calc(100vw - 20px));max-height:calc(100vh - 80px);display:none;flex-direction:column;background:var(--glass2);backdrop-filter:blur(26px) saturate(1.4);border:1px solid var(--ln2);border-radius:16px;box-shadow:var(--sh);overflow:hidden;animation:rise .16s ease-out}
+@keyframes rise{from{transform:translateY(12px);opacity:0}to{transform:none;opacity:1}}
+#start.on{display:flex}
+#start .srch{margin:18px 18px 8px;display:flex;align-items:center;gap:8px;background:rgba(0,0,0,.25);border:1px solid var(--ln2);border-radius:22px;padding:8px 14px}
+body.light #start .srch{background:rgba(255,255,255,.7)}
+#start .srch input{flex:1;border:0;background:none;outline:none;font-size:14px}
+#start h4{margin:10px 24px 6px;font-size:12px;color:var(--tx2);font-weight:600;letter-spacing:.04em}
+#sapps{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:4px;padding:4px 16px 12px;overflow:auto}
+.sapp{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 4px;border:0;border-radius:10px;background:none;cursor:pointer;text-align:center;font-size:12px}
+.sapp svg{width:40px;height:40px}.sapp:hover,.sapp.hl{background:rgba(140,170,220,.15)}
+.sapp small{display:block;color:var(--dim);font-size:10.5px;margin-top:-3px}
+#start .sfoot{display:flex;align-items:center;gap:10px;padding:12px 20px;border-top:1px solid var(--ln);background:rgba(0,0,0,.12);font-size:12px}
+#start .sfoot .av{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--ac),var(--ac2));display:grid;place-items:center;font-weight:700;color:#061018}
+#start .sfoot .who{flex:1;line-height:1.25}#start .sfoot .who small{color:var(--dim);font-family:var(--mono)}
+/* ---------- menus, toasts ---------- */
+.menu{position:fixed;z-index:10;min-width:210px;padding:6px;background:var(--glass2);backdrop-filter:blur(20px);border:1px solid var(--ln2);border-radius:10px;box-shadow:var(--sh);display:none}
+.menu.on{display:block}
+.menu button{display:flex;width:100%;align-items:center;gap:10px;padding:7px 10px;border:0;background:none;border-radius:6px;text-align:left;cursor:pointer;font-size:13px}
+.menu button:hover{background:rgba(140,170,220,.16)}.menu hr{border:0;border-top:1px solid var(--ln);margin:5px 4px}
+.menu button svg{width:16px;height:16px}
+#toasts{position:fixed;right:14px;bottom:64px;z-index:11;display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+.toast{background:var(--glass2);backdrop-filter:blur(20px);border:1px solid var(--ln2);border-radius:10px;padding:10px 14px;box-shadow:var(--sh);max-width:360px;font-size:12.5px;animation:rise .16s}
+.toast b{display:block;margin-bottom:2px}
+/* ---------- app content ---------- */
+.pad{padding:14px 16px;overflow:auto;flex:1;min-height:0}
+.tbtn{height:30px;padding:0 12px;border:1px solid var(--ln2);border-radius:7px;background:rgba(140,170,220,.08);cursor:pointer;font-size:12.5px;display:inline-flex;align-items:center;gap:6px}
+.tbtn:hover{border-color:var(--ac);color:var(--ac)}.tbtn.pri{background:var(--ac);color:#04151a;border-color:var(--ac);font-weight:600}.tbtn.pri:hover{filter:brightness(1.1);color:#04151a}
+.tool{display:flex;gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--ln);background:var(--winhd);flex:none;flex-wrap:wrap}
+.field{height:32px;border:1px solid var(--ln2);border-radius:8px;background:rgba(0,0,0,.18);padding:0 10px;outline:none;min-width:0}
+body.light .field{background:#fff}.field:focus{border-color:var(--ac)}
+.muted{color:var(--dim)}.mono{font-family:var(--mono)}
+/* terminal */
+.term{flex:1;min-height:0;display:flex;flex-direction:column;background:#070a10}
+body.light .term{background:#0b1020}
+.tscr{flex:1;min-height:0;overflow:auto;padding:10px 12px 4px;font:13px/1.42 var(--mono);color:#d5e0f3;white-space:pre-wrap;word-break:break-word;user-select:text;cursor:text}
+.tscr .ec{color:#7fe3d6}.tscr .sys{color:#7d8aa6;font-style:italic}
+.tin{display:flex;align-items:center;gap:8px;padding:6px 12px 10px;font:13px var(--mono);color:#d5e0f3}
+.tin .pr{color:var(--gn);white-space:nowrap}
+.tin input{flex:1;background:none;border:0;outline:none;color:#e9f1ff;font:13px var(--mono);caret-color:var(--ac)}
+.tstat{font:11px var(--mono);color:#6d7b98;padding:0 12px 6px;display:flex;justify-content:space-between}
+/* monitor */
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.tile{border:1px solid var(--ln);border-radius:12px;padding:14px;background:rgba(140,170,220,.05);position:relative;overflow:hidden}
+.tile::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--dim)}
+.tile.up::before{background:var(--gn)}.tile.down::before{background:var(--rd)}.tile.np::before,.tile.slow::before{background:var(--am)}
+.tile .h{display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:600}.tile .st{white-space:nowrap;flex:none}
+.tile .st{font-size:11px;font-weight:700;letter-spacing:.06em;padding:2px 8px;border-radius:20px}
+.st.up{background:rgba(92,224,160,.16);color:var(--gn)}.st.down{background:rgba(255,107,107,.16);color:var(--rd)}.st.np,.st.slow{background:rgba(255,180,84,.16);color:var(--am)}
+.tile .p{color:var(--dim);font:12px var(--mono);margin-top:2px}.tile .d{margin-top:10px;font-size:12.5px;color:var(--tx2);word-break:break-all}.tile .d b{color:var(--tx)}
+/* rows */
+table.rows{border-collapse:collapse;width:100%;font-size:12.5px}
+table.rows td,table.rows th{padding:6px 8px;border-bottom:1px solid var(--ln);vertical-align:top;text-align:left}
+table.rows th{color:var(--tx2);font-weight:600;position:sticky;top:0;background:var(--win)}
+.kv{display:inline-block;margin:1px 6px 1px 0;font:12px var(--mono);color:var(--tx2)}.kv b{color:var(--tx);font-weight:500}
+.tag{font:600 11px var(--mono);color:var(--ac);white-space:nowrap}
+/* files */
+.files{flex:1;min-height:0;display:grid;grid-template-columns:minmax(240px,50%) 1fr}
+.flist{overflow:auto;border-right:1px solid var(--ln)}
+.fent{display:flex;align-items:center;gap:10px;padding:6px 12px;cursor:default;border-radius:0}
+.fent:hover{background:rgba(140,170,220,.08)}.fent.sel{background:rgba(67,232,216,.14)}
+.fent svg{width:20px;height:20px;flex:none}.fent .n{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.fent .z{color:var(--dim);font:11.5px var(--mono)}
+.fview{overflow:auto;padding:12px 14px;font:12.5px/1.5 var(--mono);white-space:pre-wrap;word-break:break-all;user-select:text}
+.crumb{display:flex;gap:2px;align-items:center;flex:1;overflow:hidden}
+.crumb button{border:0;background:none;padding:4px 7px;border-radius:6px;cursor:pointer;white-space:nowrap}.crumb button:hover{background:rgba(140,170,220,.14)}
+/* recall */
+.hit{padding:10px 12px;border:1px solid var(--ln);border-radius:10px;margin-bottom:8px;background:rgba(140,170,220,.04);cursor:pointer}.hit:hover{border-color:var(--ac)}
+.hit .pth{font:12.5px var(--mono);color:var(--ac);word-break:break-all}.hit .m{margin-top:4px}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid var(--ln2);border-top-color:var(--ac);border-radius:50%;animation:sp 0.8s linear infinite;vertical-align:-2px}
+@keyframes sp{to{transform:rotate(360deg)}}
+/* settings / about */
+.set{display:grid;grid-template-columns:150px 1fr;gap:14px 16px;align-items:center;max-width:560px}
+.set label{color:var(--tx2)}.set>*:nth-child(even){justify-self:start}
+.seg{display:inline-flex;border:1px solid var(--ln2);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:none;padding:6px 12px;cursor:pointer;font-size:12.5px}.seg button.on{background:var(--ac);color:#04151a;font-weight:600}
+.swatch{width:26px;height:26px;border-radius:50%;border:2px solid transparent;cursor:pointer;display:inline-block;margin-right:6px}.swatch.on{border-color:var(--tx)}
+.about{display:flex;gap:22px;align-items:flex-start}.about svg.lg{width:120px;height:120px;flex:none}
+.about h2{margin:4px 0 2px;font-weight:300;letter-spacing:.18em}.about dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:14px 0 0;font-size:12.5px}.about dt{color:var(--dim)}.about dd{margin:0;font-family:var(--mono);word-break:break-all}
+.view{flex:1;min-height:0;display:flex;background:#000}.view img{flex:1;min-width:0;width:100%;object-fit:contain}
+iframe.app{flex:1;border:0;width:100%;background:#fff}
+.note{font-size:12px;color:var(--tx2);background:rgba(255,180,84,.08);border:1px solid rgba(255,180,84,.28);border-radius:8px;padding:8px 10px}
+@media (max-width:700px){#tray .svc{display:none}#startb span{display:none}.files{grid-template-columns:1fr}.flist{border-right:0;border-bottom:1px solid var(--ln);max-height:40%}.set{grid-template-columns:1fr}}
 </style></head><body>
-<header>
- <h1>◢ <b>ASOLARIA</b> <span class=os>ASI OS</span></h1>
- <div class=meta>
-  <div>seat <b>__ASOLARIA_SEAT__</b> · pid <b>__ASOLARIA_PID__</b></div>
-  <div><span id=clock>—</span> · kernel <b id=kver>—</b> · <span class=fire>fire=0</span></div>
- </div>
-</header>
-<div class=wrap>
- <div class=col>
-  <div class=sect>Live system (polling)</div>
-  <div class=tiles id=tiles><div class=hint>reading the live fabric…</div></div>
- </div>
- <div class=col>
-  <div class=term>
-   <div class=tbar>
-    <span class=sect style="margin:0 4px 0 0">Terminals</span>
-    <button class=btn onclick="spawn('cmd')">+ cmd</button>
-    <button class=btn onclick="spawn('powershell')">+ PowerShell</button>
-    <button class=btn onclick="spawn('bash')">+ WSL bash</button>
-    <span style="width:1px;height:16px;background:var(--ln2);margin:0 4px"></span>
-    <button class="btn am" title="run the Claude CLI in the active shell" onclick="send('claude\r\n')">claude</button>
-    <button class="btn am" title="run the Codex CLI in the active shell" onclick="send('codex\r\n')">codex</button>
-    <button class="btn" title="query the live kernel" onclick="send('curl -s http://127.0.0.1:5088/health.hbp\r\n')">kernel.hbp</button>
-    <span style="width:1px;height:16px;background:var(--ln2);margin:0 4px"></span>
-    <button class="btn vi" id="winBtn" title="click: show the Windows desktop live in this surface (view-only) · shift-click: open a Windows environment in its own window" onclick="winClick(event)">🪟 Windows</button>
-    <button class="btn" title="the backend office dashboard, pixels rendered from the HBP/HBI" onclick="window.open('/dashboard','_blank')">📊 dashboard</button>
-    <button class="btn" title="the ASI OS running in parallel (QEMU in WSL): latest screen" onclick="window.open('/asios/screen.png','_blank')">◢ ASI OS screen</button>
-    <span style="flex:1"></span>
-    <button class="btn rd" onclick="killActive()">kill</button>
-   </div>
-   <div class=tabs id=tabs></div>
-   <div class=winpane id=winpane hidden><div class=winbar>🪟 Windows · <b>view-only</b> · source <a href="#" id=winsrc onclick="winSrc(event)">capture</a> · <span id=winstat>connecting…</span></div><img id=winimg alt="Windows desktop (view-only)"></div>
-   <div class=screen id=screen><span class=none>No terminal open. Click <b>+ cmd</b> / <b>+ PowerShell</b> / <b>+ WSL bash</b> to open a real shell on the live system, then type — including <b>claude</b> and <b>codex</b>.</span></div>
-   <div class=inrow><span class=p>❯</span><input id=cmd placeholder="type into the active terminal — Enter to send (Shift+Enter = raw newline)" autocomplete=off spellcheck=false></div>
-  </div>
- </div>
+<div id=wall class=cube></div>
+<div id=desk role=grid aria-label="Desktop"></div>
+<div id=ghost></div>
+<div id=wins></div>
+<div id=shield></div>
+<div id=start role=dialog aria-label="Start">
+ <div class=srch><svg width=16 height=16 viewBox="0 0 24 24" fill=none stroke=currentColor stroke-width=2.2 stroke-linecap=round><circle cx=10.5 cy=10.5 r=6.5 /><path d="M15.5 15.5 21 21"/></svg><input id=sq placeholder="Type to search apps…" autocomplete=off spellcheck=false></div>
+ <h4 id=shd>All apps</h4>
+ <div id=sapps></div>
+ <div class=sfoot><div class=av>A</div><div class=who><b>__ASOLARIA_SEAT__</b><br><small>pid __ASOLARIA_PID__</small></div><span class=e0>E=0 · fire=0</span></div>
 </div>
-<footer>
- <span>Asolaria ASI OS · pure <b>Rust std</b> front-end (0 external crates, 8-byte-host ethos) · :4600 · wired to your local Asolaria fabric</span>
- <span class=fire>E=0 · nothing fires but what you type · process_launch on operator keystroke only</span>
-</footer>
+<div id=ctx class=menu></div>
+<div id=toasts></div>
+<div id=bar>
+ <button id=startb title="Start — Win key, Alt+S, or just start typing on the desktop"></button>
+ <div id=tasks></div>
+ <div id=tray><div class=svc id=svcs title="Live system — click for System Monitor"></div><span class=e0 title="E=0: nothing launches except what you click or type">E=0</span><div id=clock><span id=ck1>--:--</span><small id=ck2>----</small></div></div>
+</div>
 <script>
-const $=s=>document.querySelector(s), screenEl=$('#screen'), tabsEl=$('#tabs'), cmdEl=$('#cmd');
-const terms={}; let active=null;
-const dec=b=>{try{return new TextDecoder().decode(Uint8Array.from(atob(b),c=>c.charCodeAt(0)))}catch(e){return ''}};
-
-function tick(){ const d=new Date(); $('#clock').textContent=d.toTimeString().slice(0,8)+' '+d.toISOString().slice(0,10); }
-setInterval(tick,1000); tick();
-
+"use strict";
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const SEAT='__ASOLARIA_SEAT__', PID='__ASOLARIA_PID__';
+const store={get(k,d){try{const v=localStorage.getItem('asios.'+k);return v===null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem('asios.'+k,JSON.stringify(v))}catch(e){}}};
+/* ===================== icons (inline SVG) ===================== */
+const G={
+ term:['#1f2a44','#0b1120','<path d="M15 19l8 6-8 6" stroke="#5ce0a0" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M26 32h9" stroke="#e6edf9" stroke-width="3.2" stroke-linecap="round"/>'],
+ ps:['#2b5bd7','#11307f','<path d="M14 18l11 7-11 7" stroke="#fff" stroke-width="3.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M26 33h9" stroke="#bcd3ff" stroke-width="3.2" stroke-linecap="round"/>'],
+ bash:['#e8692c','#9a2e12','<text x="24" y="31" text-anchor="middle" font-family="Consolas,monospace" font-size="17" font-weight="700" fill="#fff">$_</text><circle cx="35" cy="14" r="3" fill="#ffd9c4"/>'],
+ claude:['#e7915f','#b5512d','<g stroke="#fff6ee" stroke-width="3" stroke-linecap="round"><path d="M24 12v24M12 24h24M15.5 15.5l17 17M32.5 15.5l-17 17"/></g><circle cx="24" cy="24" r="4" fill="#fff6ee"/>'],
+ codex:['#1a1f2b','#000','<path d="M18 16c-4 0-4 3-4 5s-2 3-3 3c1 0 3 1 3 3s0 5 4 5M30 16c4 0 4 3 4 5s2 3 3 3c-1 0-3 1-3 3s0 5-4 5" stroke="#fff" stroke-width="2.6" fill="none" stroke-linecap="round"/><circle cx="24" cy="24" r="2.6" fill="#43e8d8"/>'],
+ mon:['#0f8a7d','#06463f','<path d="M10 26h7l3-8 5 15 4-11 2 4h7" stroke="#eafff9" stroke-width="2.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'],
+ kernel:['#5b3fd1','#2a1a7a','<rect x="16" y="16" width="16" height="16" rx="3" fill="none" stroke="#efeaff" stroke-width="2.6"/><rect x="21" y="21" width="6" height="6" rx="1" fill="#ffb454"/><g stroke="#efeaff" stroke-width="2.2" stroke-linecap="round"><path d="M20 11v4M24 11v4M28 11v4M20 33v4M24 33v4M28 33v4M11 20h4M11 24h4M11 28h4M33 20h4M33 24h4M33 28h4"/></g>'],
+ recall:['#18a0c9','#0b4f7a','<circle cx="22" cy="22" r="8" fill="none" stroke="#fff" stroke-width="3.2"/><path d="M28 28l8 8" stroke="#fff" stroke-width="3.6" stroke-linecap="round"/><path d="M18 22h8M22 18v8" stroke="#bff1ff" stroke-width="2" stroke-linecap="round"/>'],
+ files:['#f4b740','#c47a12','<path d="M10 17a3 3 0 0 1 3-3h7l3 3h12a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H13a3 3 0 0 1-3-3z" fill="#fff3d6"/><path d="M10 21h28v11a3 3 0 0 1-3 3H13a3 3 0 0 1-3-3z" fill="#ffd27a"/>'],
+ dash:['#2bb673','#126a40','<rect x="13" y="25" width="5" height="10" rx="1.5" fill="#fff"/><rect x="21.5" y="18" width="5" height="17" rx="1.5" fill="#dfffe9"/><rect x="30" y="13" width="5" height="22" rx="1.5" fill="#fff"/>'],
+ asios:['#141c34','#05070f','<path d="M24 10l12 7-12 7-12-7z" fill="#43e8d8"/><path d="M12 17l12 7v14l-12-7z" fill="#a78bfa"/><path d="M36 17l-12 7v14l12-7z" fill="#ffb454"/>'],
+ win:['#2a83e8','#0f4aa0','<rect x="13" y="13" width="10" height="10" rx="1" fill="#fff"/><rect x="25" y="13" width="10" height="10" rx="1" fill="#e6f1ff"/><rect x="13" y="25" width="10" height="10" rx="1" fill="#e6f1ff"/><rect x="25" y="25" width="10" height="10" rx="1" fill="#fff"/>'],
+ set:['#5e6b85','#2d3548','<circle cx="24" cy="24" r="10" fill="none" stroke="#fff" stroke-width="5" stroke-dasharray="4 3.85"/><circle cx="24" cy="24" r="7" fill="none" stroke="#fff" stroke-width="3"/><circle cx="24" cy="24" r="2.5" fill="#fff"/>'],
+ about:['#43e8d8','#1b7e9a','<circle cx="24" cy="24" r="12" fill="none" stroke="#fff" stroke-width="2.8"/><path d="M24 22v9" stroke="#fff" stroke-width="3.2" stroke-linecap="round"/><circle cx="24" cy="17" r="2.2" fill="#fff"/>'],
+ dir:['#f4b740','#c47a12',''],file:['#7d8db0','#46557a','']
+};
+function icon(k){const g=G[k]||G.about, id='g'+k+Math.random().toString(36).slice(2,7);
+ return `<svg viewBox="0 0 48 48" aria-hidden=true><defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${g[0]}"/><stop offset="1" stop-color="${g[1]}"/></linearGradient></defs><rect x="3" y="3" width="42" height="42" rx="11" fill="url(#${id})"/><rect x="3.5" y="3.5" width="41" height="41" rx="10.5" fill="none" stroke="rgba(255,255,255,.18)"/>${g[2]}</svg>`;}
+const FICON={dir:'<svg viewBox="0 0 24 24"><path d="M2 6.5A1.5 1.5 0 0 1 3.5 5H9l2 2h9.5A1.5 1.5 0 0 1 22 8.5v10a1.5 1.5 0 0 1-1.5 1.5h-17A1.5 1.5 0 0 1 2 18.5z" fill="#f4b740"/><path d="M2 10h20v8.5a1.5 1.5 0 0 1-1.5 1.5h-17A1.5 1.5 0 0 1 2 18.5z" fill="#ffd27a"/></svg>',
+ file:'<svg viewBox="0 0 24 24"><path d="M6 2h8l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" fill="#c9d4ea"/><path d="M14 2v5h5" fill="#9aa8c3"/><path d="M7 12h10M7 15h10M7 18h6" stroke="#6b7a99" stroke-width="1.3"/></svg>',
+ hbp:'<svg viewBox="0 0 24 24"><path d="M6 2h8l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" fill="#43e8d8"/><path d="M14 2v5h5" fill="#1b9e93"/><path d="M12 10l4 2.3-4 2.3-4-2.3z" fill="#063b37"/><path d="M8 12.3l4 2.3v4.6l-4-2.3zM16 12.3l-4 2.3v4.6l4-2.3z" fill="#0b5c55"/></svg>'};
+function logo(sz){return `<svg viewBox="0 0 48 48" width="${sz}" height="${sz}" aria-hidden=true><path d="M24 4l17 10-17 10L7 14z" fill="#43e8d8"/><path d="M7 14l17 10v20L7 34z" fill="#a78bfa"/><path d="M41 14L24 24v20l17-10z" fill="#ffb454"/><path d="M24 24v20M7 14l17 10 17-10" stroke="rgba(6,10,20,.45)" stroke-width="1.2" fill="none"/></svg>`;}
+const WB={min:'<svg viewBox="0 0 12 12"><path d="M1 6h10" stroke="currentColor" stroke-width="1.3"/></svg>',max:'<svg viewBox="0 0 12 12"><rect x="1.5" y="1.5" width="9" height="9" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>',rest:'<svg viewBox="0 0 12 12"><rect x="1.5" y="3.5" width="7" height="7" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M3.5 3.5V2.6c0-.6.5-1.1 1.1-1.1h4.8c.6 0 1.1.5 1.1 1.1v4.8c0 .6-.5 1.1-1.1 1.1h-.9" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>',x:'<svg viewBox="0 0 12 12"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.3"/></svg>'};
+/* ===================== wallpaper: the 3x3x3 cube, integer geometry ===================== */
+function hero(){
+ // isometric cube, half-width 156, half-height 90, edge 180; every face split into thirds (52/30/60 — all integers)
+ const P=(x,y)=>`${x+200},${y+210}`, L=[];
+ const face=(pts,c)=>`<polygon points="${pts.map(p=>P(p[0],p[1])).join(' ')}" fill="url(#${c})" stroke="rgba(220,235,255,.35)" stroke-width="1.2"/>`;
+ for(let i=1;i<3;i++){ // grid lines on each face
+  L.push([[-156+52*i,-90-30*i],[52*i,-30*i]],[[52*i,-180+30*i],[-156+52*i,-90+30*i]]); // top
+  L.push([[-156,-90+60*i],[0,60*i]],[[-156+52*i,-90+30*i],[-156+52*i,90+30*i]]); // left
+  L.push([[0,60*i],[156,-90+60*i]],[[52*i,-30*i],[52*i,180-30*i]]); // right
+ }
+ const lines=L.map(l=>`<line x1="${l[0][0]+200}" y1="${l[0][1]+210}" x2="${l[1][0]+200}" y2="${l[1][1]+210}"/>`).join('');
+ let dots=''; for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++){dots+=`<circle cx="${200+52*a-52*b}" cy="${120+30*a+30*b}" r="${a===0&&b===0?5:3}" fill="${a===0&&b===0?'#fff':'rgba(255,255,255,.75)'}"/>`;}
+ return `<svg class=hero viewBox="0 0 400 430" aria-hidden=true><defs>
+ <linearGradient id=ft x1=0 y1=0 x2=1 y2=1><stop offset=0 stop-color="rgba(67,232,216,.55)"/><stop offset=1 stop-color="rgba(67,232,216,.18)"/></linearGradient>
+ <linearGradient id=fl x1=0 y1=0 x2=0 y2=1><stop offset=0 stop-color="rgba(167,139,250,.55)"/><stop offset=1 stop-color="rgba(167,139,250,.12)"/></linearGradient>
+ <linearGradient id=fr x1=0 y1=0 x2=0 y2=1><stop offset=0 stop-color="rgba(255,180,84,.5)"/><stop offset=1 stop-color="rgba(255,180,84,.1)"/></linearGradient>
+ <radialGradient id=glow><stop offset=0 stop-color="rgba(120,170,255,.35)"/><stop offset=1 stop-color="rgba(120,170,255,0)"/></radialGradient></defs>
+ <ellipse cx=200 cy=230 rx=200 ry=200 fill="url(#glow)"/>
+ ${face([[0,-180],[156,-90],[0,0],[-156,-90]],'ft')}${face([[-156,-90],[0,0],[0,180],[-156,90]],'fl')}${face([[0,0],[156,-90],[156,90],[0,180]],'fr')}
+ <g stroke="rgba(230,240,255,.28)" stroke-width="1">${lines}</g>${dots}</svg>`;
+}
+function applyWall(){const w=store.get('wall','cube'), el=$('#wall'); el.className=w; el.innerHTML=(w==='cube'||w==='aurora'?hero():'')+`<div class=mark><b>ASOLARIA</b>ASI OS</div>`;}
+/* ===================== apps ===================== */
+const APPS=[
+ {k:'cmd',name:'Command Prompt',ic:'term',sub:'cmd.exe shell',kind:'term',shell:'cmd',w:760,h:460},
+ {k:'ps',name:'PowerShell',ic:'ps',sub:'Windows PowerShell',kind:'term',shell:'powershell',w:760,h:460},
+ {k:'bash',name:'WSL Bash',ic:'bash',sub:'Ubuntu · bash -il',kind:'term',shell:'bash',w:760,h:460},
+ {k:'claude',name:'Claude',ic:'claude',sub:'runs claude in a shell',kind:'term',shell:'powershell',cmdline:'claude',w:820,h:520},
+ {k:'codex',name:'Codex',ic:'codex',sub:'runs codex in a shell',kind:'term',shell:'powershell',cmdline:'codex',w:820,h:520},
+ {k:'mon',name:'System Monitor',ic:'mon',sub:'live fabric status',kind:'mon',w:720,h:470},
+ {k:'kernel',name:'Kernel',ic:'kernel',sub:'host8 :5088 rows',kind:'kernel',w:820,h:500},
+ {k:'recall',name:'Recall Search',ic:'recall',sub:'HILBRA vault :4796',kind:'recall',w:780,h:560},
+ {k:'files',name:'Files',ic:'files',sub:'backend office (read-only)',kind:'files',w:900,h:560},
+ {k:'dash',name:'Dashboard',ic:'dash',sub:'office render',kind:'dash',w:1000,h:640},
+ {k:'asios',name:'ASI OS Screen',ic:'asios',sub:'metal kernel in QEMU',kind:'asios',w:820,h:600},
+ {k:'win',name:'Windows View',ic:'win',sub:'view-only desktop',kind:'winview',w:900,h:560},
+ {k:'set',name:'Settings',ic:'set',sub:'theme · wallpaper',kind:'settings',w:620,h:440,single:1},
+ {k:'about',name:'About',ic:'about',sub:'this system',kind:'about',w:600,h:400,single:1},
+];
+const APP=Object.fromEntries(APPS.map(a=>[a.k,a]));
+/* ===================== live status (shared) ===================== */
+let LIVE={rows:{},ok:false,t:0}; const liveSubs=new Set();
+function hbp(line){const p=line.split('|'), o={_tag:p[0]}; for(const f of p.slice(1)){const i=f.indexOf('='); if(i>0)o[f.slice(0,i)]=f.slice(i+1);} return o;}
 async function poll(){
- try{
-  const t=await (await fetch('/api/live',{cache:'no-store'})).text();
-  const rows={}; t.trim().split('\n').forEach(l=>{const k=l.split('|')[0]; rows[k]=l;});
-  const kv=(rows.KERNEL||'').match(/version=([^|]*)/); $('#kver').textContent=kv?kv[1]:'—';
-  const def=[
-   ['KERNEL','host8 · 8-byte Rust kernel',':5088',x=>{const v=(x.match(/version=([^|]*)/)||[])[1]||''; const a=(x.match(/anchor=([^|]*)/)||[])[1]||''; return `version <b>${v}</b><br>${a}`;}],
-   ['RECALL','recall vault',':4796',_=>'your local inverted-index vault · <b>HILBRA</b>'],
-   ['BUS','behcs bus',':4947',x=>{const d=(x.match(/inbox_depth=([^|]*)/)||[])[1]||'-'; return `inbox depth <b>${d}</b>`;}],
-   ['FABRIC','super-dashboard',':4949',_=>'unified fabric · AgentTerms/EZProtect'],
-   ['SOVLINUX','sovereignty vault','local',_=>'your machine · <b>local vault</b>'],
-  ];
-  $('#tiles').innerHTML=def.map(([k,nm,port,sub])=>{
-   const row=rows[k]||''; const up=/\bup=1\b/.test(row)|| (k==='SOVLINUX');
-   return `<div class="tile ${up?'up':'down'}"><div class=r1><span class=nm>${nm} <small>${port}</small></span><span class="dot ${up?'up':'down'}"></span></div><div class=sub>${sub(row)}</div></div>`;
-  }).join('');
- }catch(e){}
+ try{const t=await (await fetch('/api/live',{cache:'no-store'})).text(); const rows={}; t.trim().split('\n').forEach(l=>{const o=hbp(l); rows[o._tag]=o;}); LIVE={rows,ok:true,t:Date.now()};}
+ catch(e){LIVE={rows:{},ok:false,t:Date.now()};}
+ renderTray(); liveSubs.forEach(f=>{try{f()}catch(e){}});
 }
-setInterval(poll,3000); poll();
+const SVCS=[['KERNEL','Kernel host8',':5088'],['RECALL','Recall vault',':4796'],['BUS','BEHCS bus',':4947'],['FABRIC','Fabric',':4949'],['SOVLINUX','SOVLINUX vault','local']];
+function svcState(k){const r=LIVE.rows[k]; if(!LIVE.ok||!r) return 'down'; if(k==='SOVLINUX') return r.present==='NOT_PROBED'?'np':(r.present?'up':'down'); return r.up==='1'?'up':r.listen==='1'?'slow':'down';}
+const SVCLABEL={up:'UP',down:'UNREACHABLE',np:'NOT PROBED',slow:'SLOW'};
+function renderTray(){ $('#svcs').innerHTML=SVCS.map(([k,n])=>`<i class="${svcState(k)}" title="${esc(n)}: ${SVCLABEL[svcState(k)].toLowerCase()}"></i>`).join(''); }
+/* ===================== window manager ===================== */
+let Z=10, WID=0; const W=new Map(); let focused=null;
+const area=()=>({w:window.innerWidth,h:window.innerHeight-52});
+function clampWin(o){const a=area(); o.w=Math.min(o.w,a.w); o.h=Math.min(o.h,a.h); o.x=Math.max(0,Math.min(o.x,a.w-o.w)); o.y=Math.max(0,Math.min(o.y,a.h-o.h)); return o;}
+function place(el,g){el.style.left=g.x+'px';el.style.top=g.y+'px';el.style.width=g.w+'px';el.style.height=g.h+'px';}
+function openApp(k,opts={}){
+ const a=APP[k]; if(!a) return;
+ if(a.single){for(const w of W.values()) if(w.app.k===k){restore(w.id);focus(w.id);return w;}}
+ closeMenus();
+ const id=++WID, el=document.createElement('div'); el.className='win'; el.dataset.id=id;
+ el.innerHTML=`<div class=tb>${icon(a.ic)}<div class=tt>${esc(opts.title||a.name)}<small></small></div><button class=wb data-a=min title=Minimize>${WB.min}</button><button class=wb data-a=max title=Maximize>${WB.max}</button><button class="wb x" data-a=close title=Close>${WB.x}</button></div><div class=wbody></div>`+['n','s','e','w','ne','nw','se','sw'].map(d=>`<div class="rz ${d}" data-d=${d}></div>`).join('');
+ const ar=area(), saved=store.get('geo.'+k,null), n=W.size;
+ let g=saved?{...saved}:{w:a.w,h:a.h,x:Math.max(20,(ar.w-a.w)/2|0)+n*28,y:Math.max(16,(ar.h-a.h)/3|0)+n*24};
+ if(saved&&n){g.x+=n*24;g.y+=n*20;}
+ g=clampWin(g); place(el,g);
+ $('#wins').appendChild(el);
+ const w={id,app:a,el,body:$('.wbody',el),geo:g,max:false,min:false,cleanup:[],title:opts.title||a.name};
+ W.set(id,w);
+ wireWin(w);
+ if(ar.w<700) toggleMax(id,true);
+ focus(id); renderTasks();
+ try{ RUN[a.kind](w,opts); }catch(e){ w.body.innerHTML=`<div class=pad><div class=note>app failed to start: ${esc(e.message)}</div></div>`; }
+ return w;
+}
+function setSub(w,t){$('.tt small',w.el).textContent=t||'';}
+function focus(id){const w=W.get(id); if(!w) return; focused=id; w.el.style.zIndex=++Z; for(const x of W.values()) x.el.classList.toggle('inactive',x.id!==id); renderTasks(); if(w.onfocus) w.onfocus();}
+function closeWin(id){const w=W.get(id); if(!w) return; w.cleanup.forEach(f=>{try{f()}catch(e){}}); w.el.remove(); W.delete(id); if(focused===id){focused=null; const top=[...W.values()].filter(x=>!x.min).sort((a,b)=>b.el.style.zIndex-a.el.style.zIndex)[0]; if(top) focus(top.id);} renderTasks();}
+function minimize(id){const w=W.get(id); if(!w) return; w.min=true; w.el.classList.add('min'); if(focused===id) focused=null; renderTasks();}
+function restore(id){const w=W.get(id); if(!w) return; w.min=false; w.el.classList.remove('min');}
+function toggleMax(id,force){const w=W.get(id); if(!w) return; w.max=force===undefined?!w.max:force; w.el.classList.toggle('max',w.max);
+ if(w.max){const a=area(); place(w.el,{x:0,y:0,w:a.w,h:a.h});} else place(w.el,w.geo);
+ $('[data-a=max]',w.el).innerHTML=w.max?WB.rest:WB.max; $('[data-a=max]',w.el).title=w.max?'Restore':'Maximize'; if(w.onresize) w.onresize();}
+function saveGeo(w){store.set('geo.'+w.app.k,w.geo);}
+function wireWin(w){
+ const el=w.el, tb=$('.tb',el);
+ el.addEventListener('pointerdown',()=>{ if(focused!==w.id) focus(w.id); },true);
+ tb.addEventListener('dblclick',e=>{ if(!e.target.closest('.wb')) toggleMax(w.id); });
+ tb.addEventListener('click',e=>{const b=e.target.closest('.wb'); if(!b) return; const a=b.dataset.a; if(a==='min')minimize(w.id); else if(a==='max')toggleMax(w.id); else closeWin(w.id);});
+ tb.addEventListener('pointerdown',e=>{
+  if(e.button!==0||e.target.closest('.wb')) return; e.preventDefault();
+  const sx=e.clientX, sy=e.clientY; let g0={...w.geo}, moved=false, snap=null;
+  if(w.max){ // drag a maximized window out: restore under the pointer
+   const fx=Math.min(Math.max(.1,(sx)/area().w),.9); g0={...w.geo,x:(sx-w.geo.w*fx)|0,y:0};
+  }
 
-async function spawn(shell){
- const id=await (await fetch('/term/spawn',{method:'POST',body:shell})).text();
- terms[id]={id,label:shell,buf:''};
- const es=new EventSource('/term/stream?id='+id);
- es.onmessage=e=>{ terms[id].buf+=dec(e.data); if(active===id) render(); };
- es.addEventListener('end',()=>{ terms[id].buf+='\n[session ended]\n'; if(active===id) render(); es.close(); });
- terms[id].es=es;
- renderTabs(); setActive(id); cmdEl.focus();
+  const mv=ev=>{const dx=ev.clientX-sx, dy=ev.clientY-sy; if(!moved&&Math.abs(dx)+Math.abs(dy)<4) return;
+   if(!moved){moved=true; shield('move'); if(w.max){w.max=false; w.el.classList.remove('max'); $('[data-a=max]',el).innerHTML=WB.max;}}
+   w.geo=clampWin({...g0,x:g0.x+dx,y:g0.y+dy}); place(el,w.geo);
+   const a=area(); snap=ev.clientX<=6?'l':ev.clientX>=a.w-6?'r':ev.clientY<=4?'t':null; ghost(snap);};
+  const up=()=>{unshield(); removeEventListener('pointermove',mv); removeEventListener('pointerup',up); ghost(null);
+   if(!moved) return; const a=area();
+   if(snap==='t') toggleMax(w.id,true);
+   else if(snap){const g={x:snap==='l'?0:(a.w/2|0),y:0,w:a.w/2|0,h:a.h}; place(el,g); w.geo=g;}
+   saveGeo(w); if(w.onresize) w.onresize();};
+  addEventListener('pointermove',mv); addEventListener('pointerup',up);
+ });
+ $$('.rz',el).forEach(h=>h.addEventListener('pointerdown',e=>{
+  e.preventDefault(); e.stopPropagation(); const d=h.dataset.d, sx=e.clientX, sy=e.clientY, g0={...w.geo};
+  shield(getComputedStyle(h).cursor);
+  const mv=ev=>{const dx=ev.clientX-sx, dy=ev.clientY-sy; const g={...g0};
+   if(d.includes('e')) g.w=Math.max(300,g0.w+dx);
+   if(d.includes('s')) g.h=Math.max(180,g0.h+dy);
+   if(d.includes('w')){g.w=Math.max(300,g0.w-dx); g.x=g0.x+g0.w-g.w;}
+   if(d.includes('n')){g.h=Math.max(180,g0.h-dy); g.y=Math.max(0,g0.y+g0.h-g.h);}
+   w.geo=g; place(el,g); if(w.onresize) w.onresize();};
+  const up=()=>{unshield(); removeEventListener('pointermove',mv); removeEventListener('pointerup',up); saveGeo(w);};
+  addEventListener('pointermove',mv); addEventListener('pointerup',up);
+ }));
 }
-function renderTabs(){
- tabsEl.innerHTML=Object.values(terms).map(t=>`<div class="tab ${active===t.id?'active':''}" onclick="setActive(${t.id})">${t.label}#${t.id}<span class=x onclick="event.stopPropagation();killTerm(${t.id})">✕</span></div>`).join('');
+function shield(cur){const s=$('#shield'); s.style.display='block'; s.style.cursor=cur||'default';}
+function unshield(){$('#shield').style.display='none';}
+function ghost(s){const g=$('#ghost'); if(!s){g.style.display='none';return;} const a=area(); g.style.display='block';
+ Object.assign(g.style, s==='t'?{left:'6px',top:'6px',width:a.w-12+'px',height:a.h-12+'px'}:{left:(s==='l'?6:(a.w/2|0)+6)+'px',top:'6px',width:(a.w/2|0)-12+'px',height:a.h-12+'px'}); g.style.zIndex=Z+1;}
+addEventListener('resize',()=>{for(const w of W.values()){ if(w.max){const a=area(); place(w.el,{x:0,y:0,w:a.w,h:a.h});} else {w.geo=clampWin(w.geo); place(w.el,w.geo);} if(w.onresize) w.onresize(); }});
+/* ===================== taskbar ===================== */
+function renderTasks(){
+ $('#tasks').innerHTML=[...W.values()].map(w=>`<button class="task ${focused===w.id&&!w.min?'on':''}" data-id=${w.id} title="${esc(w.title)}">${icon(w.app.ic)}<span>${esc(w.title)}</span></button>`).join('');
 }
-function setActive(id){ active=id; renderTabs(); render(); }
-function render(){ const t=terms[active]; if(!t){screenEl.innerHTML='<span class=none>No terminal open.</span>';return;} screenEl.textContent=t.buf; screenEl.scrollTop=screenEl.scrollHeight; }
-async function send(data){ if(!active) return; await fetch('/term/input?id='+active,{method:'POST',body:data}); }
-async function killTerm(id){ await fetch('/term/kill?id='+id,{method:'POST'}); if(terms[id]){terms[id].es&&terms[id].es.close(); delete terms[id];} if(active===id){active=Object.keys(terms)[0]?+Object.keys(terms)[0]:null;} renderTabs(); render(); }
-function killActive(){ if(active) killTerm(active); }
-let winOn=false, winUrl=null, winFrom='capture';
-/* source: "capture" = this server grabs the desktop itself (always current);
-   "projector" = the external projector loop's last frame, labelled LIVE or STALE with its age */
-function winSrc(e){ e.preventDefault(); winFrom = winFrom==='capture' ? 'projector' : 'capture'; $('#winsrc').textContent=winFrom; }
-function winClick(e){ if(e.shiftKey){ winLaunch(); return; } winOn=!winOn; $('#winpane').hidden=!winOn; screenEl.hidden=winOn; if(winOn) winLoop(); }
-async function winLoop(){
-  if(!winOn) return;
-  const w=Math.max(320,Math.min(1920,Math.round($('#winpane').clientWidth*(window.devicePixelRatio||1))));
-  try{
-    let label='';
-    if(winFrom==='projector'){
-      const st=await (await fetch('/win/state.hbp',{cache:'no-store'})).text();
-      const m=/status=([A-Z-]+)(?:\|age_s=(\d+))?/.exec(st);
-      label = m ? ('projector '+m[1]+(m[2]!==undefined?' · '+m[2]+' s old':'')) : 'projector: no state';
-    }
-    const r=await fetch(winFrom==='capture' ? '/win/screen.bmp?w='+w : '/win/frame.jpg', {cache:'no-store'});
-    if(r.ok){ const u=URL.createObjectURL(await r.blob()); $('#winimg').src=u; if(winUrl) URL.revokeObjectURL(winUrl); winUrl=u; $('#winstat').textContent = winFrom==='capture' ? ('live capture · '+w+'px wide') : label; }
-    else $('#winstat').textContent=(label?label+' · ':'')+'no frame ('+r.status+')';
-  }catch(e){ $('#winstat').textContent='no frame'; }
-  setTimeout(winLoop, winFrom==='capture' ? 400 : 1200);
-}
-async function winLaunch(){ try{ const r=await (await fetch('/win/launch',{method:'POST'})).text(); }catch(e){} }
-cmdEl.addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); const v=cmdEl.value; cmdEl.value=''; send(v+'\r\n'); } });
+$('#tasks').addEventListener('click',e=>{const b=e.target.closest('.task'); if(!b) return; const id=+b.dataset.id, w=W.get(id);
+ if(w.min){restore(id);focus(id);} else if(focused===id) minimize(id); else focus(id);});
+$('#tasks').addEventListener('contextmenu',e=>{const b=e.target.closest('.task'); if(!b) return; e.preventDefault(); const id=+b.dataset.id;
+ menu(e.clientX,e.clientY-120,[['Restore / focus',()=>{restore(id);focus(id);}],['Minimize',()=>minimize(id)],['Maximize',()=>{restore(id);toggleMax(id,true);focus(id);}],null,['Close window',()=>closeWin(id)]]);});
+$('#startb').innerHTML=logo(28)+'<span>ASOLARIA</span>';
+$('#startb').addEventListener('click',e=>{e.stopPropagation(); toggleStart();});
+$('#svcs').addEventListener('click',()=>openApp('mon'));
+function tick(){const d=new Date(), p=n=>String(n).padStart(2,'0'); const sec=store.get('secs',false);
+ $('#ck1').textContent=p(d.getHours())+':'+p(d.getMinutes())+(sec?':'+p(d.getSeconds()):''); $('#ck2').textContent=d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
+ $('#clock').title=d.toString();}
+setInterval(tick,1000); tick();
+/* ===================== start menu ===================== */
+let sHL=0, sList=[];
+function toggleStart(force){const s=$('#start'), was=s.classList.contains('on'), on=force===undefined?!was:force; closeCtx();
+ s.classList.toggle('on',on); $('#startb').classList.toggle('on',on); if(on&&!was){$('#sq').value=''; renderStart(); const q=$('#sq'); q.focus(); q.setSelectionRange(q.value.length,q.value.length);}}
+function renderStart(){const q=$('#sq').value.trim().toLowerCase();
+ sList=APPS.filter(a=>!q||a.name.toLowerCase().includes(q)||a.sub.toLowerCase().includes(q)||a.k.includes(q)); if(sHL>=sList.length) sHL=0;
+ $('#shd').textContent=q?(sList.length?'Best matches':'No apps match “'+q+'”'):'All apps';
+ $('#sapps').innerHTML=sList.map((a,i)=>`<button class="sapp ${q&&i===sHL?'hl':''}" data-k=${a.k}>${icon(a.ic)}<span>${esc(a.name)}<small>${esc(a.sub)}</small></span></button>`).join('');}
+$('#sq').addEventListener('input',()=>{sHL=0;renderStart();});
+$('#sq').addEventListener('keydown',e=>{
+ if(e.key==='Enter'&&sList[sHL]){e.preventDefault(); toggleStart(false); openApp(sList[sHL].k);}
+ else if(e.key==='ArrowRight'||e.key==='ArrowDown'){e.preventDefault(); sHL=Math.min(sList.length-1,sHL+1); renderStartHL();}
+ else if(e.key==='ArrowLeft'||e.key==='ArrowUp'){e.preventDefault(); sHL=Math.max(0,sHL-1); renderStartHL();}});
+function renderStartHL(){$$('.sapp').forEach((b,i)=>b.classList.toggle('hl',i===sHL));}
+$('#sapps').addEventListener('click',e=>{const b=e.target.closest('.sapp'); if(!b) return; toggleStart(false); openApp(b.dataset.k);});
+/* ===================== desktop icons ===================== */
+const DESK=['cmd','ps','bash','claude','codex','files','recall','mon','kernel','dash','asios','win','set','about'];
+let dSel=-1;
+function renderDesk(){$('#desk').innerHTML=DESK.map((k,i)=>`<div class="dico ${i===dSel?'sel':''}" tabindex=0 role=gridcell data-k=${k} data-i=${i} title="${esc(APP[k].sub)}">${icon(APP[k].ic)}<span>${esc(APP[k].name)}</span></div>`).join('');}
+function selDesk(i){dSel=i; $$('.dico').forEach((d,j)=>d.classList.toggle('sel',j===i)); const d=$$('.dico')[i]; if(d) d.focus();}
+$('#desk').addEventListener('pointerdown',e=>{closeMenus(); const d=e.target.closest('.dico'); selDesk(d?+d.dataset.i:-1);});
+$('#desk').addEventListener('dblclick',e=>{const d=e.target.closest('.dico'); if(d) openApp(d.dataset.k);});
+$('#desk').addEventListener('keydown',e=>{
+ const n=DESK.length; if(dSel<0) return;
+ const rows=Math.max(1,Math.floor(($('#desk').clientHeight-28)/(parseInt(getComputedStyle(document.body).getPropertyValue('--ico'))+48)));
+ if(e.key==='Enter'){e.preventDefault(); openApp(DESK[dSel]);}
+ else if(e.key==='ArrowDown') selDesk(Math.min(n-1,dSel+1)); else if(e.key==='ArrowUp') selDesk(Math.max(0,dSel-1));
+ else if(e.key==='ArrowRight') selDesk(Math.min(n-1,dSel+rows)); else if(e.key==='ArrowLeft') selDesk(Math.max(0,dSel-rows));});
+$('#desk').addEventListener('contextmenu',e=>{e.preventDefault(); const d=e.target.closest('.dico');
+ if(d){ const k=d.dataset.k; selDesk(+d.dataset.i); menu(e.clientX,e.clientY,[['Open',()=>openApp(k)],null,['About '+APP[k].name,()=>toast(APP[k].name,APP[k].sub)]]); return; }
+ menu(e.clientX,e.clientY,[[icon('term')+'New terminal',()=>openApp('cmd')],[icon('bash')+'New WSL Bash',()=>openApp('bash')],null,[icon('mon')+'Refresh',()=>{poll(); renderDesk(); toast('Refreshed','live status re-read from /api/live');}],[icon('set')+'Settings',()=>openApp('set')],[icon('about')+'About',()=>openApp('about')]]);});
+/* ===================== menus / toasts ===================== */
+function menu(x,y,items){const m=$('#ctx'); m.innerHTML=''; items.forEach(it=>{ if(!it){m.appendChild(document.createElement('hr'));return;} const b=document.createElement('button'); b.innerHTML=it[0]; b.onclick=()=>{closeCtx(); it[1]();}; m.appendChild(b);});
+ m.classList.add('on'); const r=m.getBoundingClientRect(); m.style.left=Math.min(x,innerWidth-r.width-6)+'px'; m.style.top=Math.max(6,Math.min(y,innerHeight-r.height-58))+'px'; m.style.zIndex=Z+50;}
+function closeCtx(){$('#ctx').classList.remove('on');}
+function closeMenus(){closeCtx(); toggleStart(false);}
+document.addEventListener('pointerdown',e=>{ if(!e.target.closest('#ctx')) closeCtx(); if(!e.target.closest('#start')&&!e.target.closest('#startb')) toggleStart(false); });
+function toast(t,b,ms=3500){const d=document.createElement('div'); d.className='toast'; d.innerHTML=`<b>${esc(t)}</b>${esc(b||'')}`; $('#toasts').appendChild(d); setTimeout(()=>d.remove(),ms);}
+/* ===================== global keys ===================== */
+let metaAlone=false;
+document.addEventListener('keydown',e=>{
+ if(e.key==='Meta'){metaAlone=true;return;} metaAlone=false;
+ if(e.key==='Escape'&&!e.ctrlKey){ if($('#start').classList.contains('on')||$('#ctx').classList.contains('on')){closeMenus(); e.preventDefault();} return; }
+ if(e.altKey&&!e.ctrlKey&&(e.code==='KeyS'||e.code==='Space')){e.preventDefault(); toggleStart(); return;}
+ const typing=e.target.closest&&e.target.closest('input,textarea,select,[contenteditable],.term');
+ if(!typing&&!e.ctrlKey&&!e.altKey&&!e.metaKey&&e.key.length===1&&/\S/.test(e.key)&&!$('#start').classList.contains('on')){e.preventDefault(); toggleStart(true); $('#sq').value=e.key; sHL=0; renderStart(); return;}
+ if(e.altKey&&(e.key==='`'||e.code==='Backquote')){e.preventDefault(); const ws=[...W.values()]; if(!ws.length) return; const i=ws.findIndex(w=>w.id===focused); const nx=ws[(i+1)%ws.length]; restore(nx.id); focus(nx.id); return;}
+});
+document.addEventListener('keydown',e=>{ if(e.ctrlKey&&e.key==='Escape'){e.preventDefault(); toggleStart();} },true);
+document.addEventListener('keyup',e=>{ if(e.key==='Meta'&&metaAlone){toggleStart();} metaAlone=false; });
+/* ===================== app runners ===================== */
+const RUN={};
+function rowsTable(text){const rows=text.trim().split('\n').filter(Boolean).map(hbp);
+ return `<table class=rows><tbody>${rows.map(o=>`<tr><td class=tag>${esc(o._tag)}</td><td>${Object.entries(o).filter(([k])=>k!=='_tag').map(([k,v])=>`<span class=kv>${esc(k)}=<b>${esc(v)}</b></span>`).join('')}</td></tr>`).join('')}</tbody></table>`;}
+/* --- terminal --- */
+function cleanVT(s){return s.replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g,'').replace(/\x1b\[[0-?]*[ -\/]*[@-~]/g,'').replace(/\x1b[PX^_][^\x1b]*\x1b\\/g,'').replace(/\x1b[()][0-9A-Za-z]/g,'').replace(/\x1b[=>78DEHMNOZc]/g,'').replace(/[\x00-\x07\x0b\x0c\x0e-\x1a\x1c-\x1f]/g,'');}
+function applyCR(buf,chunk){ // \r without \n rewinds to the start of the current line; \b erases one char
+ let out=buf; for(const seg of chunk.split(/(\r\n|\r|\n|\x08)/)){ if(seg==='\r\n'||seg==='\n') out+='\n'; else if(seg==='\r'){out=out.slice(0,out.lastIndexOf('\n')+1);} else if(seg==='\x08'){ if(out.length&&out[out.length-1]!=='\n') out=out.slice(0,-1);} else out+=seg; } return out;}
+const dec=b=>{try{return new TextDecoder().decode(Uint8Array.from(atob(b),c=>c.charCodeAt(0)))}catch(e){return ''}};
+RUN.term=(w,opts)=>{
+ const a=w.app, echo=a.shell==='bash'; // cmd and PowerShell echo their own input over pipes
+ w.body.innerHTML=`<div class=term><div class=tscr tabindex=-1><span class=sys>starting ${esc(a.shell)} — a real shell on this machine, opened by your click…</span>\n</div><div class=tin><span class=pr>${a.shell==='bash'?'$':a.shell==='cmd'?'&gt;':'PS&gt;'}</span><input spellcheck=false autocomplete=off aria-label="terminal input" placeholder="type a command, Enter to run · ↑↓ history · Ctrl+C interrupt · Ctrl+L clear"></div><div class=tstat><span class=st1>connecting…</span><span>pipes, not a PTY · full-screen TUIs may not render</span></div></div>`;
+ const scr=$('.tscr',w.body), inp=$('input',w.body), st=$('.st1',w.body);
+ let text='', sid=null, es=null, hist=store.get('hist.'+a.shell,[]), hi=hist.length, dead=false;
+ const MAX=200000;
+ const paint=()=>{ if(text.length>MAX) text=text.slice(-MAX); const atEnd=scr.scrollHeight-scr.scrollTop-scr.clientHeight<40; scr.textContent=text; if(atEnd) scr.scrollTop=scr.scrollHeight; };
+ const sys=m=>{text+=(text&&!text.endsWith('\n')?'\n':'')+m+'\n'; paint();};
+ const send=async d=>{ if(sid===null||dead) return; try{await fetch('/term/input?id='+sid,{method:'POST',body:d});}catch(e){sys('[asi-os] input not delivered: '+e.message);} };
+ (async()=>{
+  try{ sid=(await (await fetch('/term/spawn',{method:'POST',body:a.shell})).text()).trim(); }
+  catch(e){ sys('[asi-os] could not reach the front-end server: '+e.message); st.textContent='offline'; return; }
+  text=''; setSub(w,'#'+sid); st.textContent=a.shell+' · session '+sid+' · live';
+  es=new EventSource('/term/stream?id='+sid);
+  es.onmessage=e=>{ text=applyCR(text,cleanVT(dec(e.data))); paint(); };
+  es.addEventListener('end',()=>{dead=true; sys('[session ended]'); st.textContent='ended'; es.close();});
+  es.onerror=()=>{ if(!dead) st.textContent='stream reconnecting…'; };
+  if(a.cmdline){ setTimeout(()=>{ sys('› '+a.cmdline); send(a.cmdline+'\r\n'); },700); }
+ })();
+ inp.addEventListener('keydown',e=>{
+  if(e.key==='Enter'){e.preventDefault(); const v=inp.value; inp.value=''; if(v.trim()){hist=hist.filter(h=>h!==v); hist.push(v); hist=hist.slice(-200); store.set('hist.'+a.shell,hist);} hi=hist.length; if(echo){text+='› '+v+'\n'; paint();} send(v+'\r\n');}
+  else if(e.key==='ArrowUp'){e.preventDefault(); if(hi>0){hi--; inp.value=hist[hi]||'';}}
+  else if(e.key==='ArrowDown'){e.preventDefault(); if(hi<hist.length){hi++; inp.value=hist[hi]||'';}}
+  else if(e.ctrlKey&&(e.key==='c'||e.key==='C')&&inp.selectionStart===inp.selectionEnd&&!getSelection().toString()){e.preventDefault(); send('\x03'); sys('^C');}
+  else if(e.ctrlKey&&(e.key==='l'||e.key==='L')){e.preventDefault(); text=''; paint();}
+ });
+ scr.addEventListener('mouseup',()=>{ if(!getSelection().toString()) inp.focus(); });
+ w.onfocus=()=>setTimeout(()=>{ if(!getSelection().toString()) inp.focus(); },0);
+ w.cleanup.push(()=>{ if(es) es.close(); if(sid!==null) fetch('/term/kill?id='+sid,{method:'POST'}).catch(()=>{}); });
+ inp.focus();
+};
+/* --- system monitor --- */
+RUN.mon=w=>{
+ w.body.innerHTML=`<div class=pad><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div><b style="font-size:15px">Live system</b><div class=muted id=mt style="font-size:12px">reading /api/live…</div></div><button class=tbtn data-r>Refresh</button></div><div class=tiles></div><p class=muted style="font-size:11.5px;margin-top:14px">Every tile is read from the running services through <span class=mono>/api/live</span> every 3 s. A red tile means this front-end could not reach the port — not that the service is gone. Amber <b>SLOW</b> means the port accepts connections but its health answer took longer than the 400 ms probe. SOVLINUX is bound by label + volume serial and shown as <b>not probed</b>: this surface never probes the USB.</p></div>`;
+ const DESC={KERNEL:r=>`version <b>${esc(r.version||'-')}</b><br><span class=mono style="font-size:11px">${esc(r.anchor||'')}</span>`,RECALL:r=>`local inverted-index vault · <b>HILBRA</b>`,BUS:r=>`inbox depth <b>${esc(r.inbox_depth||'-')}</b>`,FABRIC:r=>`unified fabric · super-dashboard`,SOVLINUX:r=>`serial <b>${esc(r.volume_serial||'-')}</b> · ${esc(r.present||'-')}`};
+ const draw=()=>{ $('.tiles',w.body).innerHTML=SVCS.map(([k,n,p])=>{const s=svcState(k), r=LIVE.rows[k]||{}; return `<div class="tile ${s}"><div class=h>${esc(n)}<span class="st ${s}">${SVCLABEL[s]}</span></div><div class=p>${esc(p)}</div><div class=d>${(DESC[k]||(()=>''))(r)}</div></div>`;}).join('');
+  $('#mt',w.body).textContent=LIVE.ok?('seat '+((LIVE.rows.ASIOSLIVE||{}).seat||SEAT)+' · read '+new Date(LIVE.t).toLocaleTimeString()):'front-end /api/live unreachable'; };
+ $('[data-r]',w.body).onclick=poll; liveSubs.add(draw); w.cleanup.push(()=>liveSubs.delete(draw)); draw();
+};
+/* --- kernel --- */
+RUN.kernel=w=>{
+ w.body.innerHTML=`<div class=tool><button class="tbtn pri" data-r>Read kernel</button><span class=muted>host8 · 8-byte Rust kernel · <span class=mono>:5088/health.hbp</span> · read-only</span><span style="flex:1"></span><span class="muted mono" data-t></span></div><div class=pad data-o><span class=spin></span> reading…</div>`;
+ const go=async()=>{const o=$('[data-o]',w.body); o.innerHTML='<span class=spin></span> reading…'; try{const t=await (await fetch('/api/kernel',{cache:'no-store'})).text(); o.innerHTML=rowsTable(t); $('[data-t]',w.body).textContent=new Date().toLocaleTimeString();}catch(e){o.innerHTML=`<div class=note>could not read: ${esc(e.message)}</div>`;}};
+ $('[data-r]',w.body).onclick=go; go();
+};
+/* --- recall --- */
+RUN.recall=w=>{
+ w.body.innerHTML=`<div class=tool><input class=field style="flex:1" placeholder="Search your recall vault — e.g. BROWN-HILBERT" maxlength=128 spellcheck=false><button class="tbtn pri" data-go>Search</button></div><div class=pad data-o><div class=muted>Ask the local HILBRA inverted index (:4796). It returns <span class=mono>path · pid · bh · offset · length</span> rows. Large vaults can take several seconds.</div></div>`;
+ const inp=$('input',w.body), o=$('[data-o]',w.body);
+ const go=async()=>{const q=inp.value.trim(); if(!q) return; o.innerHTML=`<span class=spin></span> searching “${esc(q)}”… <span class=muted data-el></span>`; const t0=Date.now(); const tm=setInterval(()=>{const e=$('[data-el]',o); if(e) e.textContent=((Date.now()-t0)/1000|0)+' s';},500);
+  try{const r=await fetch('/api/recall?q='+encodeURIComponent(q),{cache:'no-store'}); const t=await r.text(); clearInterval(tm); const ms=Date.now()-t0;
+   const rows=t.trim().split('\n').filter(Boolean).map(hbp), head=rows.find(x=>x._tag==='HILBRASEARCH'), hits=rows.filter(x=>x._tag==='HILBRAMATCH'), down=rows.find(x=>x._tag==='RECALL');
+   if(down){o.innerHTML=`<div class=note>${down.up==='0'?'Recall vault unreachable or timed out — results NOT measured (this is not “no results”).':'Query refused: '+esc(down.error||'')}<br><span class=mono>${esc(t.trim())}</span></div>`; return;}
+   o.innerHTML=`<div class=muted style="margin-bottom:10px">${hits.length} shown${head?` of <b>${esc(head.candidate_count||'?')}</b> candidates · mode ${esc(head.mode||'')} · schema <span class=mono>${esc(head.index_schema||'')}</span>`:''} · ${ms} ms</div>`+(hits.length?hits.map(h=>`<div class=hit title="click to copy the path" data-p="${esc(h.path||'')}"><div class=pth>${esc(h.path||'?')}</div><div class=m><span class=kv>level=<b>${esc(h.level||'')}</b></span><span class=kv>pid=<b>${esc(h.pid||'')}</b></span><span class=kv>bh=<b>${esc(h.bh||'')}</b></span><span class=kv>off=<b>${esc(h.off||'')}</b></span><span class=kv>len=<b>${esc(h.len||'')}</b></span></div></div>`).join(''):`<div class=note>The vault answered with 0 matches for this term. count=0 is what the index returned for this spelling — not proof the content is absent.</div>`);
+  }catch(e){clearInterval(tm); o.innerHTML=`<div class=note>request failed: ${esc(e.message)}</div>`;}};
+ o.addEventListener('click',e=>{const h=e.target.closest('.hit'); if(!h) return; const t=h.dataset.p; (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('Copied',t),()=>toast('Path',t,6000));});
+ $('[data-go]',w.body).onclick=go; inp.addEventListener('keydown',e=>{if(e.key==='Enter')go();}); inp.focus(); w.onfocus=()=>setTimeout(()=>inp.focus(),0);
+};
+/* --- files --- */
+const human=n=>{n=+n; if(n<1024) return n+' B'; if(n<1048576) return ((n/1024)|0)+' KB'; return ((n/1048576)|0)+' MB';};
+RUN.files=w=>{
+ w.body.innerHTML=`<div class=tool><button class=tbtn data-up title="Up one folder">↑</button><div class=crumb></div><button class=tbtn data-rf>Refresh</button></div><div class=files><div class=flist></div><div class=fview><span class=muted>Select a file to preview it. This browser is read-only and rooted at the backend office.</span></div></div>`;
+ let cwd=store.get('files.cwd',''), sel=null;
+ const list=$('.flist',w.body), view=$('.fview',w.body), crumb=$('.crumb',w.body);
+ const go=async p=>{cwd=p; store.set('files.cwd',p); list.innerHTML='<div class=pad><span class=spin></span></div>';
+  const parts=p?p.split('/'):[]; crumb.innerHTML=`<button data-p="">office</button>`+parts.map((s,i)=>`<span class=muted>›</span><button data-p="${esc(parts.slice(0,i+1).join('/'))}">${esc(s)}</button>`).join('');
+  try{const r=await fetch('/fs/list?p='+encodeURIComponent(p),{cache:'no-store'}); const t=await r.text();
+   if(!r.ok){ if(p){ go(''); return; } list.innerHTML=`<div class=pad><div class=note>${esc(r.status+' · '+t)}</div></div>`; return; }
+   const rows=t.trim().split('\n').map(hbp), head=rows[0]||{}, ents=rows.filter(x=>x._tag==='FS').map(x=>({...x,name:decodeURIComponent(x.name||'')}));
+   setSub(w,(head.entries||ents.length)+' items'+(head.truncated==='1'?' (first '+head.shown+')':''));
+   list.innerHTML=ents.length?ents.map(x=>{const ext=x.name.split('.').pop().toLowerCase(); return `<div class=fent data-n="${esc(x.name)}" data-k=${x.kind}>${x.kind==='dir'?FICON.dir:(ext==='hbp'||ext==='hbi')?FICON.hbp:FICON.file}<span class=n>${esc(x.name)}</span><span class=z>${x.kind==='dir'?'':human(x.bytes)}</span></div>`;}).join(''):'<div class=pad><span class=muted>empty folder</span></div>';
+  }catch(e){list.innerHTML=`<div class=pad><div class=note>${esc(e.message)}</div></div>`;}};
+ const preview=async n=>{const p=(cwd?cwd+'/':'')+n; view.innerHTML='<span class=spin></span>'; try{const r=await fetch('/fs/read?p='+encodeURIComponent(p),{cache:'no-store'}); const t=await r.text();
+  view.innerHTML=r.ok?`<div class=muted style="margin-bottom:8px">${esc(p)} · ${human(new Blob([t]).size)}</div>${esc(t)}`:`<div class=note>${esc(r.status===415?'Preview is for text files (.hbp .hbi .sha256 .md .txt .log .hex).':r.status===413?'File is over the 1 MiB preview limit.':r.status+' · '+t)}</div>`;}catch(e){view.textContent=e.message;}};
+ list.addEventListener('click',e=>{const f=e.target.closest('.fent'); if(!f) return; $$('.fent',list).forEach(x=>x.classList.remove('sel')); f.classList.add('sel'); sel=f.dataset.n; if(f.dataset.k==='file') preview(sel);});
+ list.addEventListener('dblclick',e=>{const f=e.target.closest('.fent'); if(f&&f.dataset.k==='dir') go((cwd?cwd+'/':'')+f.dataset.n);});
+ crumb.addEventListener('click',e=>{const b=e.target.closest('button'); if(b) go(b.dataset.p);});
+ $('[data-up]',w.body).onclick=()=>go(cwd.split('/').slice(0,-1).join('/'));
+ $('[data-rf]',w.body).onclick=()=>go(cwd);
+ go(cwd);
+};
+/* --- dashboard, asi os screen, windows view --- */
+RUN.dash=w=>{w.body.innerHTML=`<div class=tool><button class=tbtn data-r>Reload</button><button class=tbtn data-o>Open in browser tab</button><span class=muted>the backend office dashboard — a pixels-first render of the HBP/HBI rows</span></div><iframe class=app src="/dashboard" title=Dashboard></iframe>`;
+ $('[data-r]',w.body).onclick=()=>{$('iframe',w.body).src='/dashboard?t='+Date.now();}; $('[data-o]',w.body).onclick=()=>window.open('/dashboard','_blank');};
+RUN.asios=w=>{
+ w.body.innerHTML=`<div class=tool><button class=tbtn data-r>Refresh</button><span class=muted>the bare-metal ASI OS kernel running in QEMU beside Windows — last screen + journal</span></div><div style="flex:1;min-height:0;display:grid;grid-template-rows:minmax(0,1fr) minmax(0,32%)"><div class=view><img alt="ASI OS screen"></div><div class=pad style="border-top:1px solid var(--ln)" data-j></div></div>`;
+ const go=async()=>{const img=$('img',w.body); img.src='/asios/screen.png?t='+Date.now(); img.onerror=()=>{img.alt='no screen yet: start the parallel VM (asios-parallel.sh start + shot)';};
+  try{const r=await fetch('/asios/journal.hbp',{cache:'no-store'}); const t=await r.text(); $('[data-j]',w.body).innerHTML=r.ok?rowsTable(t.trim().split('\n').slice(-12).join('\n')):`<span class=muted>${esc(t)}</span>`;}catch(e){}};
+ $('[data-r]',w.body).onclick=go; go();
+};
+RUN.winview=w=>{
+ w.body.innerHTML=`<div class=tool><div class=seg><button class=on data-s=capture>Live capture</button><button data-s=projector>Projector</button></div><span class=muted data-st>connecting…</span><span style="flex:1"></span><button class=tbtn data-l title="Open Windows Sandbox or Explorer in its own window">Open Windows env</button></div><div class=view><img alt="Windows desktop (view-only)"></div><div class=tstat style="background:var(--winhd);padding:6px 12px"><span>view-only · this surface never sends input to Windows</span><span></span></div>`;
+ let from='capture', url=null, on=true, tmr=null;
+ const img=$('img',w.body), st=$('[data-st]',w.body);
+ const loop=async()=>{ if(!on) return; if(w.min){tmr=setTimeout(loop,1000);return;}
+  const wpx=Math.max(320,Math.min(1920,Math.round(img.clientWidth*(window.devicePixelRatio||1))));
+  try{let label=''; if(from==='projector'){const s=await (await fetch('/win/state.hbp',{cache:'no-store'})).text(); const m=/status=([A-Z-]+)(?:\|age_s=(\d+))?/.exec(s); label=m?('projector '+m[1]+(m[2]!==undefined?' · '+m[2]+' s old':'')):'projector: no state';}
+   const r=await fetch(from==='capture'?'/win/screen.bmp?w='+wpx:'/win/frame.jpg',{cache:'no-store'});
+   if(r.ok){const u=URL.createObjectURL(await r.blob()); img.src=u; if(url) URL.revokeObjectURL(url); url=u; st.textContent=from==='capture'?('live capture · '+wpx+' px'):label;} else st.textContent=(label?label+' · ':'')+'no frame ('+r.status+')';
+  }catch(e){st.textContent='no frame';}
+  tmr=setTimeout(loop,from==='capture'?500:1200);};
+ $('.seg',w.body).addEventListener('click',e=>{const b=e.target.closest('button'); if(!b) return; from=b.dataset.s; $$('.seg button',w.body).forEach(x=>x.classList.toggle('on',x===b));});
+ $('[data-l]',w.body).onclick=async()=>{try{const t=await (await fetch('/win/launch',{method:'POST'})).text(); toast('Windows',t);}catch(e){toast('Windows','launch failed: '+e.message);}};
+ w.cleanup.push(()=>{on=false; clearTimeout(tmr); if(url) URL.revokeObjectURL(url);}); loop();
+};
+/* --- settings --- */
+const ACCENTS=[['#43e8d8','#a78bfa'],['#5b9bff','#7cf0ff'],['#ffb454','#ff6b9a'],['#5ce0a0','#43e8d8'],['#c084fc','#f472b6']];
+function applySettings(){document.body.classList.toggle('light',store.get('theme','dark')==='light');
+ document.body.style.setProperty('--ico',store.get('ico',56)+'px'); const a=ACCENTS[store.get('accent',0)]||ACCENTS[0];
+ document.body.style.setProperty('--ac',a[0]); document.body.style.setProperty('--ac2',a[1]); applyWall();}
+RUN.settings=w=>{
+ const seg=(k,opts,cur)=>`<div class=seg data-k=${k}>${opts.map(([v,l])=>`<button data-v="${v}" class="${String(cur)===String(v)?'on':''}">${l}</button>`).join('')}</div>`;
+ const draw=()=>{w.body.innerHTML=`<div class=pad><h3 style="margin:0 0 16px;font-weight:600">Personalize</h3><div class=set>
+  <label>Theme</label>${seg('theme',[['dark','Dark'],['light','Light']],store.get('theme','dark'))}
+  <label>Wallpaper</label>${seg('wall',[['cube','Cube'],['aurora','Aurora'],['dusk','Dusk'],['plain','Plain']],store.get('wall','cube'))}
+  <label>Icon size</label>${seg('ico',[[44,'Small'],[56,'Medium'],[68,'Large']],store.get('ico',56))}
+  <label>Accent</label><div data-k=accent>${ACCENTS.map((a,i)=>`<span class="swatch ${store.get('accent',0)===i?'on':''}" data-v=${i} style="background:linear-gradient(135deg,${a[0]},${a[1]})"></span>`).join('')}</div>
+  <label>Clock seconds</label>${seg('secs',[['false','Off'],['true','On']],store.get('secs',false))}
+  <label>Windows</label><div><button class=tbtn data-reset>Reset window positions</button></div></div>
+  <p class=muted style="font-size:12px;margin-top:20px">Settings live in this browser (localStorage). They change pixels only — nothing on the system is started or written.</p></div>`;};
+ draw();
+ w.body.addEventListener('click',e=>{const b=e.target.closest('[data-v]'); const g=e.target.closest('[data-k]');
+  if(e.target.closest('[data-reset]')){Object.keys(localStorage).filter(k=>k.startsWith('asios.geo.')).forEach(k=>localStorage.removeItem(k)); toast('Windows','saved positions cleared'); return;}
+  if(!b||!g) return; let v=b.dataset.v; const k=g.dataset.k; if(k==='ico'||k==='accent') v=+v; if(k==='secs') v=v==='true';
+  store.set(k,v); applySettings(); renderDesk(); tick(); draw();});
+};
+/* --- about --- */
+RUN.about=w=>{
+ const draw=()=>{const k=LIVE.rows.KERNEL||{}; w.body.innerHTML=`<div class=pad><div class=about>${logo(120).replace('<svg','<svg class=lg')}<div><h2>ASOLARIA ASI OS</h2><div class=muted>desktop shell · served by a pure Rust std front-end</div><dl>
+ <dt>seat</dt><dd>${esc(SEAT)}</dd><dt>pid</dt><dd>${esc(PID)}</dd><dt>kernel</dt><dd>${esc(k.version||'—')}</dd><dt>anchor</dt><dd>${esc(k.anchor||'—')}</dd>
+ <dt>front-end</dt><dd>Rust std · 0 external crates · loopback only</dd><dt>fire</dt><dd style="color:var(--gn)">E=0 · fire=0 — nothing launches except what you click or type</dd></dl></div></div></div>`;};
+ liveSubs.add(draw); w.cleanup.push(()=>liveSubs.delete(draw)); draw();
+};
+/* ===================== boot ===================== */
+applySettings(); renderDesk(); renderStart(); poll(); setInterval(poll,3000);
 </script>
 </body></html>

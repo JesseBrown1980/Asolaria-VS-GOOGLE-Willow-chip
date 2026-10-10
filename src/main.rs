@@ -7,6 +7,7 @@
 //! Server-Sent-Events, feed stdin over POST. Framework latency is microseconds; the CLIs (claude/codex)
 //! run as commands inside the shells. E=0: it launches only what the human types.
 
+mod fsr;
 mod win;
 
 use std::collections::HashMap;
@@ -192,6 +193,21 @@ fn handle(mut stream: TcpStream) -> std::io::Result<()> {
             let r = launch_windows_env();
             write_resp(&mut stream, 200, "text/plain", r.as_bytes())
         }
+        // --- read-only desktop-app lanes (recall proxy, kernel rows, office browser); no spawns ---
+        ("GET", "/api/recall") => {
+            let (code, body) = recall(&query);
+            write_resp(&mut stream, code, "text/plain; charset=utf-8", body.as_bytes())
+        }
+        ("GET", "/api/kernel") => {
+            let body = http_get("127.0.0.1", 5088, "/health.hbp", 800).unwrap_or_else(|| {
+                "HOST8|up=0|port=5088|note=kernel-unreachable-from-front-end|json=0\n".into()
+            });
+            write_resp(&mut stream, 200, "text/plain; charset=utf-8", body.as_bytes())
+        }
+        ("GET", "/fs/list") | ("GET", "/fs/read") => {
+            let (code, ctype, body) = office_browse(&path, &query);
+            write_resp(&mut stream, code, ctype, &body)
+        }
         _ => write_resp(&mut stream, 404, "text/plain", b"not found"),
     }
 }
@@ -199,7 +215,11 @@ fn handle(mut stream: TcpStream) -> std::io::Result<()> {
 fn write_resp(stream: &mut TcpStream, code: u16, ctype: &str, body: &[u8]) -> std::io::Result<()> {
     let status = match code {
         200 => "200 OK",
+        400 => "400 Bad Request",
+        403 => "403 Forbidden",
         404 => "404 Not Found",
+        413 => "413 Payload Too Large",
+        415 => "415 Unsupported Media Type",
         _ => "500 Internal Server Error",
     };
     let head = format!(
@@ -437,22 +457,130 @@ fn live_status() -> String {
 
     format!(
         "ASIOSLIVE|ts_unix={}|seat={}\n\
-         KERNEL|port=5088|up={}|version={}|anchor={}\n\
-         RECALL|port=4796|up={}|role=local-inverted-index-vault\n\
-         BUS|port=4947|up={}|inbox_depth={}\n\
-         FABRIC|port=4949|up={}|role=super-dashboard\n\
+         KERNEL|port=5088|up={}|listen={}|version={}|anchor={}\n\
+         RECALL|port=4796|up={}|listen={}|role=local-inverted-index-vault\n\
+         BUS|port=4947|up={}|listen={}|inbox_depth={}\n\
+         FABRIC|port=4949|up={}|listen={}|role=super-dashboard\n\
          SOVLINUX|bind=label+volume_serial|label=SOVLINUX|volume_serial={}|role=local-sovereignty-vault|present=NOT_PROBED\n",
         now_unix(),
         seat_name(),
         b(kernel_up),
+        b(kernel_up || listening(5088)),
         kver,
         kanchor,
         b(recall_up),
+        b(recall_up || listening(4796)),
         b(bus_up),
+        b(bus_up || listening(4947)),
         inbox,
         b(fabric_up),
+        b(fabric_up || listening(4949)),
         read_ident("ASOLARIA_SOVLINUX_SERIAL", "sovlinux.serial", "UNSET"),
     )
+}
+
+/// Recall search through the front-end: the query is validated and re-encoded, and an
+/// unreachable vault answers with an explicit `up=0` row — never an empty "no results".
+fn recall(query: &str) -> (u16, String) {
+    let Some(upstream) = fsr::recall_path(query) else {
+        return (
+            400,
+            format!(
+                "RECALL|up=-|error=bad-query|rule=1..{}-bytes-no-control|json=0\n",
+                fsr::RECALL_Q_MAX
+            ),
+        );
+    };
+    match http_get_len("127.0.0.1", 4796, &upstream, 20_000) {
+        Some(b) => (200, b),
+        None => (
+            200,
+            "RECALL|up=0|port=4796|note=recall-vault-unreachable-or-timed-out|results=NOT_MEASURED|json=0\n"
+                .into(),
+        ),
+    }
+}
+
+/// The office file browser: `/fs/list?p=` rows or `/fs/read?p=` text, rooted at the office.
+fn office_browse(path: &str, query: &str) -> (u16, &'static str, Vec<u8>) {
+    let Some(root) = office_dir() else {
+        return (404, "text/plain", NO_OFFICE.to_vec());
+    };
+    let rel = String::from_utf8(fsr::url_decode(fsr::query_raw(query, "p").unwrap_or("")))
+        .unwrap_or_else(|_| "\0".into());
+    let refused = |r: fsr::Refuse| match r {
+        fsr::Refuse::Bad => (400, "text/plain", b"refused: bad path".to_vec()),
+        fsr::Refuse::Outside => (403, "text/plain", b"refused: outside the office".to_vec()),
+        fsr::Refuse::Missing => (404, "text/plain", b"not found".to_vec()),
+    };
+    if path == "/fs/list" {
+        return match fsr::list_rows(&root, &rel) {
+            Ok(s) => (200, "text/plain; charset=utf-8", s.into_bytes()),
+            Err(r) => refused(r),
+        };
+    }
+    match fsr::read_file(&root, &rel) {
+        fsr::ReadOut::Text(b) => (200, "text/plain; charset=utf-8", b),
+        fsr::ReadOut::Refused(r) => refused(r),
+        fsr::ReadOut::NotText => (
+            415,
+            "text/plain",
+            b"not a text file the browser serves".to_vec(),
+        ),
+        fsr::ReadOut::TooBig(n) => (
+            413,
+            "text/plain",
+            format!("too big: {n} bytes > {} limit", fsr::READ_MAX).into_bytes(),
+        ),
+    }
+}
+
+/// GET that stops at Content-Length instead of waiting for the peer to close (the recall
+/// vault keeps connections alive, and a search can take seconds).
+fn http_get_len(host: &str, port: u16, path: &str, timeout_ms: u64) -> Option<String> {
+    let addr: std::net::SocketAddr = format!("{host}:{port}").parse().ok()?;
+    let mut s = TcpStream::connect_timeout(&addr, Duration::from_millis(1500)).ok()?;
+    s.set_read_timeout(Some(Duration::from_millis(timeout_ms)))
+        .ok()?;
+    let req = format!("GET {path} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n");
+    s.write_all(req.as_bytes()).ok()?;
+    let mut buf = Vec::new();
+    let mut tmp = [0u8; 8192];
+    let mut want: Option<usize> = None;
+    loop {
+        if want.is_none() {
+            if let Some(i) = buf.windows(4).position(|w| w == b"\r\n\r\n") {
+                let head = String::from_utf8_lossy(&buf[..i]).to_ascii_lowercase();
+                if !head.starts_with("http/1.1 200") && !head.starts_with("http/1.0 200") {
+                    return None;
+                }
+                let cl = head
+                    .lines()
+                    .find_map(|l| l.strip_prefix("content-length:"))
+                    .and_then(|v| v.trim().parse::<usize>().ok());
+                want = Some(i + 4 + cl.unwrap_or(usize::MAX - i - 4));
+            }
+        }
+        if let Some(w) = want {
+            if buf.len() >= w {
+                break;
+            }
+        }
+        match s.read(&mut tmp) {
+            Ok(0) | Err(_) => break,
+            Ok(n) => buf.extend_from_slice(&tmp[..n]),
+        }
+    }
+    let i = buf.windows(4).position(|w| w == b"\r\n\r\n")? + 4;
+    let end = want.unwrap_or(buf.len()).min(buf.len());
+    Some(String::from_utf8_lossy(&buf[i..end]).to_string())
+}
+
+/// The port accepts a TCP connection. `up=0|listen=1` means the service is there but its
+/// health answer did not arrive inside the probe window: slow, not gone.
+fn listening(port: u16) -> bool {
+    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
+    TcpStream::connect_timeout(&addr, Duration::from_millis(300)).is_ok()
 }
 
 fn b(v: bool) -> u8 {
@@ -665,6 +793,30 @@ mod tests {
         assert_eq!(query_num("w=960&x=1", "w"), Some(960));
         assert_eq!(query_num("ww=5", "w"), None);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn get_len_stops_at_content_length_on_a_keep_alive_peer() {
+        // The recall vault answers `connection: keep-alive` and never closes; a reader that
+        // waits for EOF times out and reports the vault down. This one must return at once.
+        let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = l.local_addr().unwrap().port();
+        let srv = thread::spawn(move || {
+            let (mut c, _) = l.accept().unwrap();
+            let mut req = [0u8; 512];
+            let n = c.read(&mut req).unwrap();
+            assert!(req[..n].ends_with(b"\r\n\r\n"));
+            c.write_all(
+                b"HTTP/1.1 200 OK\r\ncontent-length: 7\r\nconnection: keep-alive\r\n\r\nROW|a=1",
+            )
+            .unwrap();
+            thread::sleep(Duration::from_millis(3000));
+        });
+        let t0 = std::time::Instant::now();
+        let body = http_get_len("127.0.0.1", port, "/x", 10_000);
+        assert_eq!(body.as_deref(), Some("ROW|a=1"));
+        assert!(t0.elapsed() < Duration::from_millis(2000));
+        srv.join().unwrap();
     }
 
     #[test]
