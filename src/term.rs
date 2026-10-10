@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::process::{Child, Command, Stdio};
-use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -68,7 +68,19 @@ fn sessions() -> &'static Mutex<HashMap<u64, Arc<Session>>> {
     static S: OnceLock<Mutex<HashMap<u64, Arc<Session>>>> = OnceLock::new();
     S.get_or_init(|| Mutex::new(HashMap::new()))
 }
-static NEXT_ID: AtomicU64 = AtomicU64::new(1);
+/// A random session id not already in use (ids are unguessable, never sequential).
+fn new_id() -> u64 {
+    loop {
+        let id = crate::guard::session_id();
+        if !sessions().lock().unwrap().contains_key(&id) {
+            return id;
+        }
+    }
+}
+
+pub fn live_count() -> usize {
+    sessions().lock().unwrap().len()
+}
 
 /// Clamp a requested size to what the session routes accept (cols 10..500, rows 5..200).
 pub fn clamp_size(cols: i32, rows: i32) -> (i16, i16) {
@@ -162,7 +174,7 @@ fn home_dir() -> Option<String> {
 /// Start a session; returns (id, mode).
 pub fn spawn(shell: &str, cols: i32, rows: i32) -> (u64, &'static str) {
     let (cols, rows) = clamp_size(cols, rows);
-    let id = NEXT_ID.fetch_add(1, Ordering::SeqCst);
+    let id = new_id();
     let out = new_shared();
     let done = Arc::new(AtomicBool::new(false));
     let home = home_dir();
@@ -308,7 +320,7 @@ pub fn stream(mut stream: TcpStream, id: u64) -> std::io::Result<()> {
         return crate::write_resp(&mut stream, 404, "text/plain", b"no session");
     };
     let _ = stream.set_nodelay(true);
-    let head = "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nConnection: keep-alive\r\n\r\n";
+    let head = "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-store\r\nReferrer-Policy: no-referrer\r\nX-Content-Type-Options: nosniff\r\nConnection: keep-alive\r\n\r\n";
     stream.write_all(head.as_bytes())?;
     stream.write_all(
         format!(

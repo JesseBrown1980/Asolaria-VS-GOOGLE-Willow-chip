@@ -8,6 +8,7 @@
 //! run as commands inside the shells. E=0: it launches only what the human types.
 
 mod fsr;
+mod guard;
 #[cfg(windows)]
 mod pty_win;
 mod term;
@@ -21,6 +22,7 @@ use std::time::Duration;
 
 const BIND: &str = "127.0.0.1:4600";
 const INDEX_HTML: &str = include_str!("index.html");
+static PORT: std::sync::OnceLock<u16> = std::sync::OnceLock::new();
 
 fn main() {
     // Loopback only. $ASOLARIA_ASIOS_PORT lets a new build run beside the live one for a
@@ -32,6 +34,14 @@ fn main() {
         Some(p) => format!("127.0.0.1:{p}"),
         None => BIND.to_string(),
     };
+    let port: u16 = bind
+        .rsplit(':')
+        .next()
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(4600);
+    PORT.set(port).ok();
+    // mint this boot's token now, so a missing OS RNG stops the server before it serves anything
+    let _ = guard::token();
     let listener = TcpListener::bind(&bind).unwrap_or_else(|e| panic!("bind {bind}: {e}"));
     println!("ASOLARIA ASI OS front-end — live on http://{bind}  (Rust std, 0 deps)");
     for stream in listener.incoming().flatten() {
@@ -46,7 +56,7 @@ fn handle(mut stream: TcpStream) -> std::io::Result<()> {
     let mut reader = BufReader::new(peer);
 
     let mut req_line = String::new();
-    if reader.read_line(&mut req_line)? == 0 {
+    if (&mut reader).take(8192).read_line(&mut req_line)? == 0 {
         return Ok(());
     }
     let mut parts = req_line.split_whitespace();
@@ -54,18 +64,66 @@ fn handle(mut stream: TcpStream) -> std::io::Result<()> {
     let target = parts.next().unwrap_or("/").to_string();
 
     let mut content_length = 0usize;
-    loop {
+    let (mut host, mut origin, mut fetch_site, mut token) = (None, None, None, None);
+    for _ in 0..100 {
         let mut line = String::new();
-        if reader.read_line(&mut line)? == 0 {
+        if (&mut reader).take(8192).read_line(&mut line)? == 0 {
             break;
         }
         let t = line.trim_end();
         if t.is_empty() {
             break;
         }
-        let lower = t.to_ascii_lowercase();
-        if let Some(v) = lower.strip_prefix("content-length:") {
-            content_length = v.trim().parse().unwrap_or(0);
+        let Some((k, v)) = t.split_once(':') else {
+            continue;
+        };
+        let v = v.trim().to_string();
+        match k.trim().to_ascii_lowercase().as_str() {
+            "content-length" => content_length = v.parse().unwrap_or(usize::MAX),
+            "host" => host = Some(v),
+            "origin" => origin = Some(v),
+            "sec-fetch-site" => fetch_site = Some(v),
+            "x-asolaria-token" => token = Some(v),
+            _ => {}
+        }
+    }
+    let (path, query) = match target.split_once('?') {
+        Some((p, q)) => (p.to_string(), q.to_string()),
+        None => (target.clone(), String::new()),
+    };
+
+    // --- guard: size, host, origin, fetch-site, token (see guard.rs) ---
+    let port = *PORT.get().unwrap_or(&4600);
+    if content_length > guard::BODY_MAX {
+        return write_resp(&mut stream, 413, "text/plain", b"refused: body over 1 MiB");
+    }
+    if !guard::host_ok(host.as_deref(), port) {
+        return write_resp(
+            &mut stream,
+            403,
+            "text/plain",
+            b"refused: Host is not this server",
+        );
+    }
+    if guard::sensitive(&path)
+        && (!guard::origin_ok(origin.as_deref(), port)
+            || !guard::fetch_site_ok(fetch_site.as_deref()))
+    {
+        return write_resp(&mut stream, 403, "text/plain", b"refused: cross-origin");
+    }
+    if guard::needs_token(&method, &path) {
+        let q = if path == "/term/stream" {
+            query.as_str()
+        } else {
+            ""
+        };
+        if !guard::token_ok(token.as_deref(), q, guard::token()) {
+            return write_resp(
+                &mut stream,
+                403,
+                "text/plain",
+                b"refused: missing or wrong token",
+            );
         }
     }
     let mut body = vec![0u8; content_length];
@@ -73,20 +131,17 @@ fn handle(mut stream: TcpStream) -> std::io::Result<()> {
         reader.read_exact(&mut body)?;
     }
 
-    let (path, query) = match target.split_once('?') {
-        Some((p, q)) => (p.to_string(), q.to_string()),
-        None => (target.clone(), String::new()),
-    };
-
     match (method.as_str(), path.as_str()) {
         ("GET", "/") | ("GET", "/index.html") => {
             let html = INDEX_HTML
                 .replace("__ASOLARIA_SEAT__", &seat_name())
-                .replace("__ASOLARIA_PID__", &seat_pid());
-            write_resp(
+                .replace("__ASOLARIA_PID__", &seat_pid())
+                .replace("__ASOLARIA_TOKEN__", guard::token());
+            write_resp_h(
                 &mut stream,
                 200,
                 "text/html; charset=utf-8",
+                "X-Frame-Options: DENY\r\nContent-Security-Policy: frame-ancestors 'none'\r\n",
                 html.as_bytes(),
             )
         }
@@ -95,6 +150,12 @@ fn handle(mut stream: TcpStream) -> std::io::Result<()> {
             let s = live_status();
             write_resp(&mut stream, 200, "text/plain; charset=utf-8", s.as_bytes())
         }
+        ("POST", "/term/spawn") if term::live_count() >= guard::SESSIONS_MAX => write_resp(
+            &mut stream,
+            429,
+            "text/plain",
+            format!("TERM|error=limit|max={}|json=0\n", guard::SESSIONS_MAX).as_bytes(),
+        ),
         ("POST", "/term/spawn") => {
             let shell = String::from_utf8_lossy(&body).trim().to_string();
             let cols = query_num(&query, "cols").unwrap_or(100);
@@ -207,6 +268,17 @@ pub(crate) fn write_resp(
     ctype: &str,
     body: &[u8],
 ) -> std::io::Result<()> {
+    write_resp_h(stream, code, ctype, "", body)
+}
+
+/// Every response: no caching, no referrer (the stream URL carries the token), no sniffing.
+fn write_resp_h(
+    stream: &mut TcpStream,
+    code: u16,
+    ctype: &str,
+    extra: &str,
+    body: &[u8],
+) -> std::io::Result<()> {
     let status = match code {
         200 => "200 OK",
         400 => "400 Bad Request",
@@ -214,10 +286,11 @@ pub(crate) fn write_resp(
         404 => "404 Not Found",
         413 => "413 Payload Too Large",
         415 => "415 Unsupported Media Type",
+        429 => "429 Too Many Requests",
         _ => "500 Internal Server Error",
     };
     let head = format!(
-        "HTTP/1.1 {status}\r\nContent-Type: {ctype}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
+        "HTTP/1.1 {status}\r\nContent-Type: {ctype}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nReferrer-Policy: no-referrer\r\nX-Content-Type-Options: nosniff\r\n{extra}Connection: close\r\n\r\n",
         body.len()
     );
     stream.write_all(head.as_bytes())?;

@@ -182,6 +182,9 @@ iframe.app{flex:1;border:0;width:100%;background:#fff}
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const SEAT='__ASOLARIA_SEAT__', PID='__ASOLARIA_PID__';
+/* per-boot token written in by the server: every POST and the terminal stream must carry it */
+const TOKEN='__ASOLARIA_TOKEN__';
+const post=(u,body)=>fetch(u,{method:'POST',body:body===undefined?'':body,headers:{'X-Asolaria-Token':TOKEN},cache:'no-store'});
 const store={get(k,d){try{const v=localStorage.getItem('asios.'+k);return v===null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem('asios.'+k,JSON.stringify(v))}catch(e){}}};
 /* ===================== icons (inline SVG) ===================== */
 const G={
@@ -647,7 +650,7 @@ RUN.term=(w)=>{
  let [cols,rows]=fit();
  let sid=null, dead=false, mode='…', sel=null, selecting=false, focused=false, rowEls=[], lastCur=-1, raf=0, rzT=0;
  let q='', busy=false;
- const flushQ=async()=>{ if(busy||!q||sid===null) return; busy=true; const d=q; q=''; try{ await fetch('/term/input?id='+sid,{method:'POST',body:d}); }catch(e){} busy=false; if(q) flushQ(); };
+ const flushQ=async()=>{ if(busy||!q||sid===null) return; busy=true; const d=q; q=''; try{ await post('/term/input?id='+sid,d); }catch(e){} busy=false; if(q) flushQ(); };
  const send=d=>{ if(dead){ closeWin(w.id); return; } q+=d; flushQ(); };
  const t=new VT(cols,rows,{reply:s=>send(s),title:s=>{ if(s){ w.title=s.slice(0,80); $('.tt',w.el).firstChild.nodeValue=w.title; renderTasks(); } }});
  const buildRows=()=>{ rowsEl.innerHTML=''; rowEls=[]; for(let i=0;i<t.rows;i++){ const d=document.createElement('div'); rowsEl.appendChild(d); rowEls.push(d);} t.allDirty(); };
@@ -663,23 +666,25 @@ RUN.term=(w)=>{
  buildRows(); schedule();
  /* resize -> grid + pseudo-console */
  const ro=new ResizeObserver(()=>{ const [c,r]=fit(); if(c===t.cols&&r===t.rows) return; t.resize(c,r); buildRows(); schedule();
-  clearTimeout(rzT); rzT=setTimeout(()=>{ if(sid!==null) fetch(`/term/resize?id=${sid}&cols=${t.cols}&rows=${t.rows}`,{method:'POST'}).catch(()=>{}); st.textContent=`${a.shell} · session ${sid} · ${mode} · ${t.cols}×${t.rows}`; },120); });
+  clearTimeout(rzT); rzT=setTimeout(()=>{ if(sid!==null) post(`/term/resize?id=${sid}&cols=${t.cols}&rows=${t.rows}`).catch(()=>{}); st.textContent=`${a.shell} · session ${sid} · ${mode} · ${t.cols}×${t.rows}`; },120); });
  ro.observe(vtEl); w.cleanup.push(()=>ro.disconnect());
  /* spawn + stream */
  const dec=new TextDecoder('utf-8');
  (async()=>{
   let row='';
-  try{ row=await (await fetch(`/term/spawn?cols=${t.cols}&rows=${t.rows}`,{method:'POST',body:a.shell})).text(); }
+  try{ row=await (await post(`/term/spawn?cols=${t.cols}&rows=${t.rows}`,a.shell)).text(); }
   catch(e){ t.write('\x1b[31m[asi-os] front-end server unreachable: '+e.message+'\x1b[0m\r\n'); schedule(); st.textContent='offline'; return; }
-  const o=hbp(row.trim()); sid=o.id; mode=o.mode||'?';
+  const o=hbp(row.trim());
+  if(o._tag!=='TERM'||!o.id){ t.write('\x1b[31m[asi-os] the server refused a new terminal: '+row.trim()+'\x1b[0m\r\n'+(o.error==='limit'?'Close some terminal windows first (max '+o.max+' at once).\r\n':'')); schedule(); st.textContent='refused'; dead=true; return; }
+  sid=o.id; mode=o.mode||'?';
   setSub(w,''); $('.tt small',w.el).innerHTML=`#${esc(sid)} <b class="mbadge ${mode==='PTY'?'pty':'pipe'}">${esc(mode)}</b>`;
   st.textContent=`${a.shell} · session ${sid} · ${mode} · ${t.cols}×${t.rows}`;
-  const es=new EventSource('/term/stream?id='+sid); let first=true;
+  const es=new EventSource('/term/stream?id='+sid+'&t='+TOKEN); let first=true;
   es.onmessage=e=>{ const bin=atob(e.data), u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i);
    t.write(dec.decode(u,{stream:true})); schedule();
    if(first&&a.cmdline){ first=false; setTimeout(()=>send(a.cmdline+'\r'),900); } };
   es.addEventListener('end',()=>{ dead=true; es.close(); t.write('\r\n\x1b[90m[process exited — press any key to close this window]\x1b[0m'); schedule(); st.textContent=`${a.shell} · session ${sid} · ended`; });
-  w.cleanup.push(()=>{ es.close(); fetch('/term/kill?id='+sid,{method:'POST'}).catch(()=>{}); });
+  w.cleanup.push(()=>{ es.close(); post('/term/kill?id='+sid).catch(()=>{}); });
  })();
  /* keyboard */
  const paste=txt=>{ if(!txt) return; txt=txt.replace(/\r?\n/g,'\r'); if(t.m.bpaste) txt='\x1b[200~'+txt+'\x1b[201~'; t.vo=0; send(txt); };
@@ -821,7 +826,7 @@ RUN.winview=w=>{
   }catch(e){st.textContent='no frame';}
   tmr=setTimeout(loop,from==='capture'?500:1200);};
  $('.seg',w.body).addEventListener('click',e=>{const b=e.target.closest('button'); if(!b) return; from=b.dataset.s; $$('.seg button',w.body).forEach(x=>x.classList.toggle('on',x===b));});
- $('[data-l]',w.body).onclick=async()=>{try{const t=await (await fetch('/win/launch',{method:'POST'})).text(); toast('Windows',t);}catch(e){toast('Windows','launch failed: '+e.message);}};
+ $('[data-l]',w.body).onclick=async()=>{try{const t=await (await post('/win/launch')).text(); toast('Windows',t);}catch(e){toast('Windows','launch failed: '+e.message);}};
  w.cleanup.push(()=>{on=false; clearTimeout(tmr); if(url) URL.revokeObjectURL(url);}); loop();
 };
 /* --- settings --- */
