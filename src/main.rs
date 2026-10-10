@@ -7,32 +7,22 @@
 //! Server-Sent-Events, feed stdin over POST. Framework latency is microseconds; the CLIs (claude/codex)
 //! run as commands inside the shells. E=0: it launches only what the human types.
 
+mod fsr;
+mod guard;
+#[cfg(windows)]
+mod pty_win;
+mod term;
 mod win;
 
-use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::process::{Child, ChildStdin, Command, Stdio};
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::process::Command;
 use std::thread;
 use std::time::Duration;
 
 const BIND: &str = "127.0.0.1:4600";
 const INDEX_HTML: &str = include_str!("index.html");
-
-struct Session {
-    stdin: Mutex<Option<ChildStdin>>,
-    out: Arc<Mutex<Vec<u8>>>,
-    child: Mutex<Option<Child>>,
-    label: String,
-}
-
-fn sessions() -> &'static Mutex<HashMap<u64, Arc<Session>>> {
-    static S: OnceLock<Mutex<HashMap<u64, Arc<Session>>>> = OnceLock::new();
-    S.get_or_init(|| Mutex::new(HashMap::new()))
-}
-static NEXT_ID: AtomicU64 = AtomicU64::new(1);
+static PORT: std::sync::OnceLock<u16> = std::sync::OnceLock::new();
 
 fn main() {
     // Loopback only. $ASOLARIA_ASIOS_PORT lets a new build run beside the live one for a
@@ -44,21 +34,50 @@ fn main() {
         Some(p) => format!("127.0.0.1:{p}"),
         None => BIND.to_string(),
     };
+    let port: u16 = bind
+        .rsplit(':')
+        .next()
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(4600);
+    PORT.set(port).ok();
+    // mint this boot's token now, so a missing OS RNG stops the server before it serves anything
+    let _ = guard::token();
     let listener = TcpListener::bind(&bind).unwrap_or_else(|e| panic!("bind {bind}: {e}"));
     println!("ASOLARIA ASI OS front-end — live on http://{bind}  (Rust std, 0 deps)");
     for stream in listener.incoming().flatten() {
+        // bounded: past CONN_MAX open connections a new one is closed at once, so a flood of
+        // idle sockets cannot pin unbounded threads
+        if OPEN_CONNS.fetch_add(1, std::sync::atomic::Ordering::SeqCst) >= guard::CONN_MAX {
+            OPEN_CONNS.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+            drop(stream);
+            continue;
+        }
         thread::spawn(move || {
+            let _slot = ConnSlot;
             let _ = handle(stream);
         });
     }
 }
 
+static OPEN_CONNS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// Releases one connection slot when the handler thread ends, however it ends.
+struct ConnSlot;
+impl Drop for ConnSlot {
+    fn drop(&mut self) {
+        OPEN_CONNS.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
 fn handle(mut stream: TcpStream) -> std::io::Result<()> {
+    // a client that trickles its request (or never reads its answer) is cut after IO_TIMEOUT
+    stream.set_read_timeout(Some(guard::IO_TIMEOUT))?;
+    stream.set_write_timeout(Some(guard::IO_TIMEOUT))?;
     let peer = stream.try_clone()?;
     let mut reader = BufReader::new(peer);
 
     let mut req_line = String::new();
-    if reader.read_line(&mut req_line)? == 0 {
+    if (&mut reader).take(8192).read_line(&mut req_line)? == 0 {
         return Ok(());
     }
     let mut parts = req_line.split_whitespace();
@@ -66,18 +85,66 @@ fn handle(mut stream: TcpStream) -> std::io::Result<()> {
     let target = parts.next().unwrap_or("/").to_string();
 
     let mut content_length = 0usize;
-    loop {
+    let (mut host, mut origin, mut fetch_site, mut token) = (None, None, None, None);
+    for _ in 0..100 {
         let mut line = String::new();
-        if reader.read_line(&mut line)? == 0 {
+        if (&mut reader).take(8192).read_line(&mut line)? == 0 {
             break;
         }
         let t = line.trim_end();
         if t.is_empty() {
             break;
         }
-        let lower = t.to_ascii_lowercase();
-        if let Some(v) = lower.strip_prefix("content-length:") {
-            content_length = v.trim().parse().unwrap_or(0);
+        let Some((k, v)) = t.split_once(':') else {
+            continue;
+        };
+        let v = v.trim().to_string();
+        match k.trim().to_ascii_lowercase().as_str() {
+            "content-length" => content_length = v.parse().unwrap_or(usize::MAX),
+            "host" => host = Some(v),
+            "origin" => origin = Some(v),
+            "sec-fetch-site" => fetch_site = Some(v),
+            "x-asolaria-token" => token = Some(v),
+            _ => {}
+        }
+    }
+    let (path, query) = match target.split_once('?') {
+        Some((p, q)) => (p.to_string(), q.to_string()),
+        None => (target.clone(), String::new()),
+    };
+
+    // --- guard: size, host, origin, fetch-site, token (see guard.rs) ---
+    let port = *PORT.get().unwrap_or(&4600);
+    if content_length > guard::BODY_MAX {
+        return write_resp(&mut stream, 413, "text/plain", b"refused: body over 1 MiB");
+    }
+    if !guard::host_ok(host.as_deref(), port) {
+        return write_resp(
+            &mut stream,
+            403,
+            "text/plain",
+            b"refused: Host is not this server",
+        );
+    }
+    if guard::sensitive(&path)
+        && (!guard::origin_ok(origin.as_deref(), port)
+            || !guard::fetch_site_ok(fetch_site.as_deref()))
+    {
+        return write_resp(&mut stream, 403, "text/plain", b"refused: cross-origin");
+    }
+    if guard::needs_token(&method, &path) {
+        let q = if path == "/term/stream" {
+            query.as_str()
+        } else {
+            ""
+        };
+        if !guard::token_ok(token.as_deref(), q, guard::token()) {
+            return write_resp(
+                &mut stream,
+                403,
+                "text/plain",
+                b"refused: missing or wrong token",
+            );
         }
     }
     let mut body = vec![0u8; content_length];
@@ -85,20 +152,17 @@ fn handle(mut stream: TcpStream) -> std::io::Result<()> {
         reader.read_exact(&mut body)?;
     }
 
-    let (path, query) = match target.split_once('?') {
-        Some((p, q)) => (p.to_string(), q.to_string()),
-        None => (target.clone(), String::new()),
-    };
-
     match (method.as_str(), path.as_str()) {
         ("GET", "/") | ("GET", "/index.html") => {
             let html = INDEX_HTML
                 .replace("__ASOLARIA_SEAT__", &seat_name())
-                .replace("__ASOLARIA_PID__", &seat_pid());
-            write_resp(
+                .replace("__ASOLARIA_PID__", &seat_pid())
+                .replace("__ASOLARIA_TOKEN__", guard::token());
+            write_resp_h(
                 &mut stream,
                 200,
                 "text/html; charset=utf-8",
+                "X-Frame-Options: DENY\r\nContent-Security-Policy: frame-ancestors 'none'\r\n",
                 html.as_bytes(),
             )
         }
@@ -107,33 +171,50 @@ fn handle(mut stream: TcpStream) -> std::io::Result<()> {
             let s = live_status();
             write_resp(&mut stream, 200, "text/plain; charset=utf-8", s.as_bytes())
         }
+        ("POST", "/term/spawn") if term::live_count() >= guard::SESSIONS_MAX => write_resp(
+            &mut stream,
+            429,
+            "text/plain",
+            format!("TERM|error=limit|max={}|json=0\n", guard::SESSIONS_MAX).as_bytes(),
+        ),
         ("POST", "/term/spawn") => {
             let shell = String::from_utf8_lossy(&body).trim().to_string();
-            let id = spawn_session(&shell);
-            write_resp(&mut stream, 200, "text/plain", id.to_string().as_bytes())
+            let cols = query_num(&query, "cols").unwrap_or(100);
+            let rows = query_num(&query, "rows").unwrap_or(30);
+            let (id, mode) = term::spawn(&shell, cols, rows);
+            let (c, r) = term::clamp_size(cols, rows);
+            let row = format!("TERM|id={id}|mode={mode}|cols={c}|rows={r}|json=0\n");
+            write_resp(&mut stream, 200, "text/plain", row.as_bytes())
         }
         ("POST", "/term/input") => {
+            let ok = term::input(query_id(&query), &body);
+            write_resp(&mut stream, 200, "text/plain", if ok { b"ok" } else { b"no-session" })
+        }
+        ("POST", "/term/resize") => {
             let id = query_id(&query);
-            if let Some(sess) = sessions().lock().unwrap().get(&id).cloned() {
-                if let Some(si) = sess.stdin.lock().unwrap().as_mut() {
-                    let _ = si.write_all(&body);
-                    let _ = si.flush();
-                }
-            }
-            write_resp(&mut stream, 200, "text/plain", b"ok")
+            let cols = query_num(&query, "cols").unwrap_or(80);
+            let rows = query_num(&query, "rows").unwrap_or(24);
+            let (applied, mode) = term::resize(id, cols, rows);
+            let (c, r) = term::clamp_size(cols, rows);
+            let row = format!(
+                "TERMRESIZE|id={id}|cols={c}|rows={r}|mode={mode}|applied={}|json=0\n",
+                u8::from(applied)
+            );
+            write_resp(&mut stream, 200, "text/plain", row.as_bytes())
         }
         ("POST", "/term/kill") => {
-            let id = query_id(&query);
-            if let Some(sess) = sessions().lock().unwrap().remove(&id) {
-                if let Some(ch) = sess.child.lock().unwrap().as_mut() {
-                    let _ = ch.kill();
-                }
-            }
+            term::kill(query_id(&query));
             write_resp(&mut stream, 200, "text/plain", b"ok")
         }
+        // The token arrives as `t=` in the query here, not as a header, because the browser's
+        // EventSource API cannot set request headers. It is accepted from the query on this one
+        // route only (the guard above passes "" as the query for every other path), and every
+        // response carries `Referrer-Policy: no-referrer` so the URL cannot leak it onward.
         ("GET", "/term/stream") => {
-            let id = query_id(&query);
-            stream_session(stream, id)
+            // the guard passed: this is a long-lived event stream that only writes, so the read
+            // timeout is lifted; the write timeout stays, so a client that stops reading is cut
+            stream.set_read_timeout(None)?;
+            term::stream(stream, query_id(&query))
         }
         // --- the backend office, read-only: rendered dashboard + the parallel ASI OS screen ---
         ("GET", "/dashboard") => match office_file("fable5-dashboard.html") {
@@ -192,18 +273,54 @@ fn handle(mut stream: TcpStream) -> std::io::Result<()> {
             let r = launch_windows_env();
             write_resp(&mut stream, 200, "text/plain", r.as_bytes())
         }
+        // --- read-only desktop-app lanes (recall proxy, kernel rows, office browser); no spawns ---
+        ("GET", "/api/recall") => {
+            let (code, body) = recall(&query);
+            write_resp(&mut stream, code, "text/plain; charset=utf-8", body.as_bytes())
+        }
+        ("GET", "/api/kernel") => {
+            let body = http_get("127.0.0.1", 5088, "/health.hbp", 800).unwrap_or_else(|| {
+                "HOST8|up=0|port=5088|note=kernel-unreachable-from-front-end|json=0\n".into()
+            });
+            write_resp(&mut stream, 200, "text/plain; charset=utf-8", body.as_bytes())
+        }
+        ("GET", "/fs/list") | ("GET", "/fs/read") => {
+            let (code, ctype, body) = office_browse(&path, &query);
+            write_resp(&mut stream, code, ctype, &body)
+        }
         _ => write_resp(&mut stream, 404, "text/plain", b"not found"),
     }
 }
 
-fn write_resp(stream: &mut TcpStream, code: u16, ctype: &str, body: &[u8]) -> std::io::Result<()> {
+pub(crate) fn write_resp(
+    stream: &mut TcpStream,
+    code: u16,
+    ctype: &str,
+    body: &[u8],
+) -> std::io::Result<()> {
+    write_resp_h(stream, code, ctype, "", body)
+}
+
+/// Every response: no caching, no referrer (the stream URL carries the token), no sniffing.
+fn write_resp_h(
+    stream: &mut TcpStream,
+    code: u16,
+    ctype: &str,
+    extra: &str,
+    body: &[u8],
+) -> std::io::Result<()> {
     let status = match code {
         200 => "200 OK",
+        400 => "400 Bad Request",
+        403 => "403 Forbidden",
         404 => "404 Not Found",
+        413 => "413 Payload Too Large",
+        415 => "415 Unsupported Media Type",
+        429 => "429 Too Many Requests",
         _ => "500 Internal Server Error",
     };
     let head = format!(
-        "HTTP/1.1 {status}\r\nContent-Type: {ctype}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
+        "HTTP/1.1 {status}\r\nContent-Type: {ctype}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nReferrer-Policy: no-referrer\r\nX-Content-Type-Options: nosniff\r\n{extra}Connection: close\r\n\r\n",
         body.len()
     );
     stream.write_all(head.as_bytes())?;
@@ -236,172 +353,6 @@ fn query_id(query: &str) -> u64 {
         }
     }
     0
-}
-
-/// Windows: real Windows shells (+ wsl bash bridge). This same binary also cross-compiles for Linux.
-#[cfg(windows)]
-fn shell_command(shell: &str) -> Command {
-    match shell {
-        "powershell" | "pwsh" => {
-            let mut c = Command::new("powershell.exe");
-            c.args(["-NoLogo", "-NoProfile"]);
-            c
-        }
-        "bash" | "wsl" => {
-            let mut c = Command::new("wsl.exe");
-            c.args(["-d", "Ubuntu", "--", "bash", "-il"]);
-            c
-        }
-        _ => Command::new("cmd.exe"),
-    }
-}
-
-/// Linux (the bare Asolaria-on-metal OS): native shells — NO Windows dependency. Terminals work with
-/// Windows fully closed. `cmd`/`powershell` requests map to a real shell so the same UI drives both.
-#[cfg(unix)]
-fn shell_command(shell: &str) -> Command {
-    let inner = match shell {
-        "zsh" => "zsh",
-        "sh" => "sh",
-        "pwsh" | "powershell" => "pwsh", // if PowerShell-on-Linux is installed
-        _ => "bash",
-    };
-    // Wrap the shell in a real pseudo-terminal via `script` (util-linux) so it is FULLY interactive
-    // over pipes — pure std, no PTY crate. `-f` flushes each write so output streams live.
-    let mut c = Command::new("script");
-    c.args(["-qfec", inner, "/dev/null"]);
-    c
-}
-
-fn spawn_session(shell: &str) -> u64 {
-    let mut cmd = shell_command(shell);
-    cmd.stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-
-    let out = Arc::new(Mutex::new(Vec::<u8>::new()));
-    let id = NEXT_ID.fetch_add(1, Ordering::SeqCst);
-
-    match cmd.spawn() {
-        Ok(mut child) => {
-            let stdin = child.stdin.take();
-            if let Some(mut so) = child.stdout.take() {
-                let o = out.clone();
-                thread::spawn(move || pump(&mut so, o));
-            }
-            if let Some(mut se) = child.stderr.take() {
-                let o = out.clone();
-                thread::spawn(move || pump(&mut se, o));
-            }
-            let sess = Arc::new(Session {
-                stdin: Mutex::new(stdin),
-                out,
-                child: Mutex::new(Some(child)),
-                label: shell.to_string(),
-            });
-            sessions().lock().unwrap().insert(id, sess);
-        }
-        Err(e) => {
-            out.lock().unwrap().extend_from_slice(
-                format!("[asi-os] could not spawn '{shell}': {e}\r\n").as_bytes(),
-            );
-            let sess = Arc::new(Session {
-                stdin: Mutex::new(None),
-                out,
-                child: Mutex::new(None),
-                label: shell.to_string(),
-            });
-            sessions().lock().unwrap().insert(id, sess);
-        }
-    }
-    id
-}
-
-fn pump<R: Read>(r: &mut R, out: Arc<Mutex<Vec<u8>>>) {
-    let mut buf = [0u8; 4096];
-    loop {
-        match r.read(&mut buf) {
-            Ok(0) | Err(_) => break,
-            Ok(n) => out.lock().unwrap().extend_from_slice(&buf[..n]),
-        }
-    }
-}
-
-fn stream_session(mut stream: TcpStream, id: u64) -> std::io::Result<()> {
-    let sess = match sessions().lock().unwrap().get(&id).cloned() {
-        Some(s) => s,
-        None => return write_resp(&mut stream, 404, "text/plain", b"no session"),
-    };
-    let head = "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nConnection: keep-alive\r\n\r\n";
-    stream.write_all(head.as_bytes())?;
-    stream.write_all(format!("event: label\ndata: {}\n\n", sess.label).as_bytes())?;
-    stream.flush()?;
-
-    let mut offset = 0usize;
-    let mut idle_ticks = 0u32;
-    loop {
-        let chunk = {
-            let buf = sess.out.lock().unwrap();
-            if buf.len() > offset {
-                let c = buf[offset..].to_vec();
-                offset += c.len();
-                Some(c)
-            } else {
-                None
-            }
-        };
-        let alive = sessions().lock().unwrap().contains_key(&id);
-        match chunk {
-            Some(c) => {
-                idle_ticks = 0;
-                let ev = format!("data: {}\n\n", base64(&c));
-                if stream.write_all(ev.as_bytes()).is_err() || stream.flush().is_err() {
-                    break;
-                }
-            }
-            None => {
-                if !alive {
-                    let _ = stream.write_all(b"event: end\ndata: end\n\n");
-                    let _ = stream.flush();
-                    break;
-                }
-                idle_ticks += 1;
-                if idle_ticks % 100 == 0 {
-                    // keepalive comment so proxies/browsers don't drop the stream
-                    if stream.write_all(b": keepalive\n\n").is_err() {
-                        break;
-                    }
-                    let _ = stream.flush();
-                }
-                thread::sleep(Duration::from_millis(80));
-            }
-        }
-    }
-    Ok(())
-}
-
-/// Minimal std base64 encoder (no external crate) — terminal bytes survive SSE faithfully.
-fn base64(data: &[u8]) -> String {
-    const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = String::with_capacity(data.len().div_ceil(3) * 4);
-    for chunk in data.chunks(3) {
-        let b0 = chunk[0];
-        let b1 = *chunk.get(1).unwrap_or(&0);
-        let b2 = *chunk.get(2).unwrap_or(&0);
-        out.push(T[(b0 >> 2) as usize] as char);
-        out.push(T[(((b0 & 0x03) << 4) | (b1 >> 4)) as usize] as char);
-        out.push(if chunk.len() > 1 {
-            T[(((b1 & 0x0f) << 2) | (b2 >> 6)) as usize] as char
-        } else {
-            '='
-        });
-        out.push(if chunk.len() > 2 {
-            T[(b2 & 0x3f) as usize] as char
-        } else {
-            '='
-        });
-    }
-    out
 }
 
 /// Read the LIVE local fabric surfaces and return a compact HBP-ish status block the UI renders.
@@ -437,22 +388,130 @@ fn live_status() -> String {
 
     format!(
         "ASIOSLIVE|ts_unix={}|seat={}\n\
-         KERNEL|port=5088|up={}|version={}|anchor={}\n\
-         RECALL|port=4796|up={}|role=local-inverted-index-vault\n\
-         BUS|port=4947|up={}|inbox_depth={}\n\
-         FABRIC|port=4949|up={}|role=super-dashboard\n\
+         KERNEL|port=5088|up={}|listen={}|version={}|anchor={}\n\
+         RECALL|port=4796|up={}|listen={}|role=local-inverted-index-vault\n\
+         BUS|port=4947|up={}|listen={}|inbox_depth={}\n\
+         FABRIC|port=4949|up={}|listen={}|role=super-dashboard\n\
          SOVLINUX|bind=label+volume_serial|label=SOVLINUX|volume_serial={}|role=local-sovereignty-vault|present=NOT_PROBED\n",
         now_unix(),
         seat_name(),
         b(kernel_up),
+        b(kernel_up || listening(5088)),
         kver,
         kanchor,
         b(recall_up),
+        b(recall_up || listening(4796)),
         b(bus_up),
+        b(bus_up || listening(4947)),
         inbox,
         b(fabric_up),
+        b(fabric_up || listening(4949)),
         read_ident("ASOLARIA_SOVLINUX_SERIAL", "sovlinux.serial", "UNSET"),
     )
+}
+
+/// Recall search through the front-end: the query is validated and re-encoded, and an
+/// unreachable vault answers with an explicit `up=0` row — never an empty "no results".
+fn recall(query: &str) -> (u16, String) {
+    let Some(upstream) = fsr::recall_path(query) else {
+        return (
+            400,
+            format!(
+                "RECALL|up=-|error=bad-query|rule=1..{}-bytes-no-control|json=0\n",
+                fsr::RECALL_Q_MAX
+            ),
+        );
+    };
+    match http_get_len("127.0.0.1", 4796, &upstream, 20_000) {
+        Some(b) => (200, b),
+        None => (
+            200,
+            "RECALL|up=0|port=4796|note=recall-vault-unreachable-or-timed-out|results=NOT_MEASURED|json=0\n"
+                .into(),
+        ),
+    }
+}
+
+/// The office file browser: `/fs/list?p=` rows or `/fs/read?p=` text, rooted at the office.
+fn office_browse(path: &str, query: &str) -> (u16, &'static str, Vec<u8>) {
+    let Some(root) = office_dir() else {
+        return (404, "text/plain", NO_OFFICE.to_vec());
+    };
+    let rel = String::from_utf8(fsr::url_decode(fsr::query_raw(query, "p").unwrap_or("")))
+        .unwrap_or_else(|_| "\0".into());
+    let refused = |r: fsr::Refuse| match r {
+        fsr::Refuse::Bad => (400, "text/plain", b"refused: bad path".to_vec()),
+        fsr::Refuse::Outside => (403, "text/plain", b"refused: outside the office".to_vec()),
+        fsr::Refuse::Missing => (404, "text/plain", b"not found".to_vec()),
+    };
+    if path == "/fs/list" {
+        return match fsr::list_rows(&root, &rel) {
+            Ok(s) => (200, "text/plain; charset=utf-8", s.into_bytes()),
+            Err(r) => refused(r),
+        };
+    }
+    match fsr::read_file(&root, &rel) {
+        fsr::ReadOut::Text(b) => (200, "text/plain; charset=utf-8", b),
+        fsr::ReadOut::Refused(r) => refused(r),
+        fsr::ReadOut::NotText => (
+            415,
+            "text/plain",
+            b"not a text file the browser serves".to_vec(),
+        ),
+        fsr::ReadOut::TooBig(n) => (
+            413,
+            "text/plain",
+            format!("too big: {n} bytes > {} limit", fsr::READ_MAX).into_bytes(),
+        ),
+    }
+}
+
+/// GET that stops at Content-Length instead of waiting for the peer to close (the recall
+/// vault keeps connections alive, and a search can take seconds).
+fn http_get_len(host: &str, port: u16, path: &str, timeout_ms: u64) -> Option<String> {
+    let addr: std::net::SocketAddr = format!("{host}:{port}").parse().ok()?;
+    let mut s = TcpStream::connect_timeout(&addr, Duration::from_millis(1500)).ok()?;
+    s.set_read_timeout(Some(Duration::from_millis(timeout_ms)))
+        .ok()?;
+    let req = format!("GET {path} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n");
+    s.write_all(req.as_bytes()).ok()?;
+    let mut buf = Vec::new();
+    let mut tmp = [0u8; 8192];
+    let mut want: Option<usize> = None;
+    loop {
+        if want.is_none() {
+            if let Some(i) = buf.windows(4).position(|w| w == b"\r\n\r\n") {
+                let head = String::from_utf8_lossy(&buf[..i]).to_ascii_lowercase();
+                if !head.starts_with("http/1.1 200") && !head.starts_with("http/1.0 200") {
+                    return None;
+                }
+                let cl = head
+                    .lines()
+                    .find_map(|l| l.strip_prefix("content-length:"))
+                    .and_then(|v| v.trim().parse::<usize>().ok());
+                want = Some(i + 4 + cl.unwrap_or(usize::MAX - i - 4));
+            }
+        }
+        if let Some(w) = want {
+            if buf.len() >= w {
+                break;
+            }
+        }
+        match s.read(&mut tmp) {
+            Ok(0) | Err(_) => break,
+            Ok(n) => buf.extend_from_slice(&tmp[..n]),
+        }
+    }
+    let i = buf.windows(4).position(|w| w == b"\r\n\r\n")? + 4;
+    let end = want.unwrap_or(buf.len()).min(buf.len());
+    Some(String::from_utf8_lossy(&buf[i..end]).to_string())
+}
+
+/// The port accepts a TCP connection. `up=0|listen=1` means the service is there but its
+/// health answer did not arrive inside the probe window: slow, not gone.
+fn listening(port: u16) -> bool {
+    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
+    TcpStream::connect_timeout(&addr, Duration::from_millis(300)).is_ok()
 }
 
 fn b(v: bool) -> u8 {
@@ -665,6 +724,30 @@ mod tests {
         assert_eq!(query_num("w=960&x=1", "w"), Some(960));
         assert_eq!(query_num("ww=5", "w"), None);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn get_len_stops_at_content_length_on_a_keep_alive_peer() {
+        // The recall vault answers `connection: keep-alive` and never closes; a reader that
+        // waits for EOF times out and reports the vault down. This one must return at once.
+        let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = l.local_addr().unwrap().port();
+        let srv = thread::spawn(move || {
+            let (mut c, _) = l.accept().unwrap();
+            let mut req = [0u8; 512];
+            let n = c.read(&mut req).unwrap();
+            assert!(req[..n].ends_with(b"\r\n\r\n"));
+            c.write_all(
+                b"HTTP/1.1 200 OK\r\ncontent-length: 7\r\nconnection: keep-alive\r\n\r\nROW|a=1",
+            )
+            .unwrap();
+            thread::sleep(Duration::from_millis(3000));
+        });
+        let t0 = std::time::Instant::now();
+        let body = http_get_len("127.0.0.1", port, "/x", 10_000);
+        assert_eq!(body.as_deref(), Some("ROW|a=1"));
+        assert!(t0.elapsed() < Duration::from_millis(2000));
+        srv.join().unwrap();
     }
 
     #[test]
