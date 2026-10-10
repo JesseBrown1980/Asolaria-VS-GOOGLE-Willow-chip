@@ -7,6 +7,8 @@
 //! Server-Sent-Events, feed stdin over POST. Framework latency is microseconds; the CLIs (claude/codex)
 //! run as commands inside the shells. E=0: it launches only what the human types.
 
+mod win;
+
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -33,8 +35,17 @@ fn sessions() -> &'static Mutex<HashMap<u64, Arc<Session>>> {
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 
 fn main() {
-    let listener = TcpListener::bind(BIND).unwrap_or_else(|e| panic!("bind {BIND}: {e}"));
-    println!("ASOLARIA ASI OS front-end — live on http://{BIND}  (Rust std, 0 deps)");
+    // Loopback only. $ASOLARIA_ASIOS_PORT lets a new build run beside the live one for a
+    // check before it takes :4600; the host part is never configurable.
+    let bind = match std::env::var("ASOLARIA_ASIOS_PORT")
+        .ok()
+        .and_then(|p| p.parse::<u16>().ok())
+    {
+        Some(p) => format!("127.0.0.1:{p}"),
+        None => BIND.to_string(),
+    };
+    let listener = TcpListener::bind(&bind).unwrap_or_else(|e| panic!("bind {bind}: {e}"));
+    println!("ASOLARIA ASI OS front-end — live on http://{bind}  (Rust std, 0 deps)");
     for stream in listener.incoming().flatten() {
         thread::spawn(move || {
             let _ = handle(stream);
@@ -123,6 +134,59 @@ fn handle(mut stream: TcpStream) -> std::io::Result<()> {
         ("GET", "/term/stream") => {
             let id = query_id(&query);
             stream_session(stream, id)
+        }
+        // --- the backend office, read-only: rendered dashboard + the parallel ASI OS screen ---
+        ("GET", "/dashboard") => match office_file("fable5-dashboard.html") {
+            Some(b) => write_resp(&mut stream, 200, "text/html; charset=utf-8", &b),
+            None => write_resp(&mut stream, 404, "text/plain", NO_OFFICE),
+        },
+        ("GET", "/asios/screen.png") => match office_file("asios-parallel/screen.png") {
+            Some(b) => write_resp(&mut stream, 200, "image/png", &b),
+            None => write_resp(&mut stream, 404, "text/plain", NO_OFFICE),
+        },
+        ("GET", "/asios/journal.hbp") => match office_file("asios-parallel/asios-parallel.hbp") {
+            Some(b) => write_resp(&mut stream, 200, "text/plain; charset=utf-8", &b),
+            None => write_resp(&mut stream, 404, "text/plain", NO_OFFICE),
+        },
+        // --- Windows as a VIEW-ONLY sub-app: the host desktop captured into a pane ---
+        ("GET", "/win/screen.bmp") => {
+            let w = query_num(&query, "w").unwrap_or(1280);
+            match win::capture(w) {
+                Some(b) => write_resp(&mut stream, 200, "image/bmp", &b),
+                None => write_resp(
+                    &mut stream,
+                    404,
+                    "text/plain",
+                    b"no capture on this platform",
+                ),
+            }
+        }
+        ("GET", "/win/screen.hbp") => {
+            let (w, h) = win::screen_size();
+            let row = format!(
+                "WINSCREEN|w={w}|h={h}|windows={}|input=0|json=0\n",
+                u8::from(cfg!(windows))
+            );
+            write_resp(
+                &mut stream,
+                200,
+                "text/plain; charset=utf-8",
+                row.as_bytes(),
+            )
+        }
+        // --- the desktop projector loop's latest frame, read-only (carried from the acer build) ---
+        ("GET", "/win/frame.jpg") => match projector_frame() {
+            Some(b) => write_resp(&mut stream, 200, "image/jpeg", &b),
+            None => write_resp(
+                &mut stream,
+                404,
+                "text/plain",
+                b"no frame: projector loop not configured or not running, or GC took the named file",
+            ),
+        },
+        ("GET", "/win/state.hbp") => {
+            let s = projector_state();
+            write_resp(&mut stream, 200, "text/plain; charset=utf-8", s.as_bytes())
         }
         ("POST", "/win/launch") => {
             let r = launch_windows_env();
@@ -377,7 +441,7 @@ fn live_status() -> String {
          RECALL|port=4796|up={}|role=local-inverted-index-vault\n\
          BUS|port=4947|up={}|inbox_depth={}\n\
          FABRIC|port=4949|up={}|role=super-dashboard\n\
-         SOVLINUX|role=local-sovereignty-vault|present=local\n",
+         SOVLINUX|bind=label+volume_serial|label=SOVLINUX|volume_serial={}|role=local-sovereignty-vault|present=NOT_PROBED\n",
         now_unix(),
         seat_name(),
         b(kernel_up),
@@ -387,11 +451,140 @@ fn live_status() -> String {
         b(bus_up),
         inbox,
         b(fabric_up),
+        read_ident("ASOLARIA_SOVLINUX_SERIAL", "sovlinux.serial", "UNSET"),
     )
 }
 
 fn b(v: bool) -> u8 {
     u8::from(v)
+}
+
+const NO_OFFICE: &[u8] =
+    b"not found: set $ASOLARIA_OFFICE or ~/.asolaria/office.dir to the backend office directory";
+
+/// The backend office directory (the render source of truth). Resolves from $ASOLARIA_OFFICE,
+/// else ~/.asolaria/office.dir; empty means unconfigured and every office route returns 404.
+fn office_dir() -> Option<std::path::PathBuf> {
+    let d = read_ident("ASOLARIA_OFFICE", "office.dir", "");
+    if d.is_empty() {
+        None
+    } else {
+        Some(std::path::PathBuf::from(d))
+    }
+}
+
+/// Read one fixed file under the office. Only the literal names in the routes reach here,
+/// so no request text is ever joined onto the path.
+fn office_file(rel: &str) -> Option<Vec<u8>> {
+    std::fs::read(office_dir()?.join(rel)).ok()
+}
+
+/// The desktop projector's runtime directory: $ASOLARIA_OMNI, else ~/.asolaria/omni.dir.
+/// Empty means not configured, and the projector routes say so instead of guessing.
+fn omni_dir() -> Option<String> {
+    let d = read_ident("ASOLARIA_OMNI", "omni.dir", "");
+    if d.is_empty() {
+        None
+    } else {
+        Some(d)
+    }
+}
+
+/// A frame older than this is reported STALE, never LIVE.
+const PROJECTOR_LIVE_S: u64 = 10;
+
+/// Read one field out of the feed index without pulling in a JSON crate — the
+/// index is written by our own loop, so its shape is known. Returns None rather
+/// than guessing when the field is absent.
+fn index_field(json: &str, key: &str) -> Option<String> {
+    let pat = format!("\"{key}\":");
+    let i = json.find(&pat)? + pat.len();
+    let rest = json[i..].trim_start();
+    if let Some(s) = rest.strip_prefix('"') {
+        Some(s[..s.find('"')?].to_string())
+    } else {
+        let end = rest.find([',', '\n', '}']).unwrap_or(rest.len());
+        Some(rest[..end].trim().to_string())
+    }
+}
+
+/// The feed index and its age in seconds (from the file's own mtime, integer).
+fn read_index() -> Option<(String, u64)> {
+    let p = format!("{}/omniscrcpy-feed-index.json", omni_dir()?);
+    let age = std::fs::metadata(&p)
+        .and_then(|m| m.modified())
+        .ok()
+        .and_then(|t| t.elapsed().ok())
+        .map(|d| d.as_secs())
+        .unwrap_or(u64::MAX);
+    Some((std::fs::read_to_string(&p).ok()?, age))
+}
+
+/// The text after the first `"key":` — used to read a field inside one nested object
+/// (the index is `frames.<device>.preview.file`, not a flat `preview` string).
+fn after<'a>(json: &'a str, key: &str) -> Option<&'a str> {
+    let pat = format!("\"{key}\":");
+    Some(&json[json.find(&pat)? + pat.len()..])
+}
+
+/// A field of the index's `preview` object (the first device's).
+fn preview_field(json: &str, key: &str) -> Option<String> {
+    index_field(after(json, "preview")?, key)
+}
+
+/// The latest projected frame. Serves ONLY a file named by the index, out of
+/// the runtime directory, by basename — never a caller-supplied path.
+fn projector_frame() -> Option<Vec<u8>> {
+    let (j, _) = read_index()?;
+    let name = preview_field(&j, "file")?.replace("\\\\", "\\");
+    let base = std::path::Path::new(&name)
+        .file_name()?
+        .to_str()?
+        .to_string();
+    std::fs::read(format!("{}/{base}", omni_dir()?)).ok()
+}
+
+fn projector_status(age_s: u64) -> &'static str {
+    if age_s <= PROJECTOR_LIVE_S {
+        "LIVE"
+    } else {
+        "STALE"
+    }
+}
+
+/// Projector state as tuple rows. Says plainly when it is not running, and calls an
+/// old frame STALE with its age, so a frozen picture never reads as the live desktop.
+fn projector_state() -> String {
+    match read_index() {
+        None => {
+            "PROJECTOR|status=NO-INDEX|running=0|note=loop-not-configured-or-not-started|json=0\n"
+                .to_string()
+        }
+        Some((j, age)) => {
+            let g = |k: &str| index_field(&j, k).unwrap_or_else(|| "-".into());
+            let pv = |k: &str| preview_field(&j, k).unwrap_or_else(|| "-".into());
+            format!(
+                "PROJECTOR|status={}|age_s={age}|device={}|transport={}|dims={}x{}|frame_sha16={}\
+                 |lane=INT|source=PIXELS|json=0\n\
+                 PROJECTOR|updated={}|captured={}|typed=0|clicked=0|sent=0|json=0\n",
+                projector_status(age),
+                g("device_id"),
+                g("transport"),
+                pv("width"),
+                pv("height"),
+                pv("sha16"),
+                g("updated_at"),
+                g("captured_at")
+            )
+        }
+    }
+}
+
+fn query_num(query: &str, key: &str) -> Option<i32> {
+    query
+        .split('&')
+        .find_map(|kv| kv.strip_prefix(key)?.strip_prefix('='))
+        .and_then(|v| v.parse().ok())
 }
 
 fn now_unix() -> u64 {
@@ -452,4 +645,48 @@ fn http_get(host: &str, port: u16, path: &str, timeout_ms: u64) -> Option<String
         Some(i) => resp[i + 4..].to_string(),
         None => resp,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn office_routes_use_fixed_names_only() {
+        let dir = std::env::temp_dir().join(format!("asios-office-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("asios-parallel")).unwrap();
+        std::fs::write(dir.join("fable5-dashboard.html"), b"<html>ok</html>").unwrap();
+        std::env::set_var("ASOLARIA_OFFICE", &dir);
+        assert_eq!(
+            office_file("fable5-dashboard.html").unwrap(),
+            b"<html>ok</html>"
+        );
+        assert!(office_file("asios-parallel/screen.png").is_none());
+        assert_eq!(query_num("w=960&x=1", "w"), Some(960));
+        assert_eq!(query_num("ww=5", "w"), None);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn projector_never_calls_an_old_frame_live() {
+        assert_eq!(projector_status(0), "LIVE");
+        assert_eq!(projector_status(PROJECTOR_LIVE_S), "LIVE");
+        assert_eq!(projector_status(PROJECTOR_LIVE_S + 1), "STALE");
+        assert_eq!(projector_status(u64::MAX), "STALE");
+        let j = "{\"updated_at\": \"2026-10-09T03:49:24Z\", \"counter\": 42,\n\"preview\": \"C:\\\\x\\\\f.jpg\"}";
+        assert_eq!(
+            index_field(j, "updated_at").as_deref(),
+            Some("2026-10-09T03:49:24Z")
+        );
+        assert_eq!(index_field(j, "counter").as_deref(), Some("42"));
+        assert_eq!(index_field(j, "missing"), None);
+        // the real index shape: frames.<device>.{full,preview}.{file,width,height,sha16}
+        let k = "{\"frames\": {\"acer-desktop\": {\"device_id\": \"acer-desktop\",\n\"full\": {\"file\": \"C:\\\\r\\\\big.png\", \"width\": 1920},\n\"preview\": {\"file\": \"C:\\\\r\\\\small.jpg\", \"width\": 720, \"height\": 405}}}}";
+        assert_eq!(
+            preview_field(k, "file").as_deref(),
+            Some("C:\\\\r\\\\small.jpg")
+        );
+        assert_eq!(preview_field(k, "width").as_deref(), Some("720"));
+        assert_eq!(index_field(k, "device_id").as_deref(), Some("acer-desktop"));
+    }
 }
