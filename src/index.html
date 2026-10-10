@@ -63,6 +63,8 @@ footer .fire{color:var(--gn)}
     <button class="btn" title="query the live kernel" onclick="send('curl -s http://127.0.0.1:5088/health.hbp\r\n')">kernel.hbp</button>
     <span style="width:1px;height:16px;background:var(--ln2);margin:0 4px"></span>
     <button class="btn vi" title="open a Windows environment as a window (Sandbox if available, else the host Windows desktop)" onclick="winLaunch()">🪟 Windows</button>
+    <button class="btn" title="the backend office dashboard, pixels rendered from the HBP/HBI" onclick="window.open('/dashboard','_blank')">📊 dashboard</button>
+    <button class="btn" title="the ASI OS running in parallel (QEMU in WSL): latest screen" onclick="window.open('/asios/screen.png','_blank')">◢ ASI OS screen</button>
     <span style="flex:1"></span>
     <button class="btn rd" onclick="killActive()">kill</button>
    </div>

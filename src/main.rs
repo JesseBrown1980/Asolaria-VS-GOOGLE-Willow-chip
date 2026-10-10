@@ -124,6 +124,19 @@ fn handle(mut stream: TcpStream) -> std::io::Result<()> {
             let id = query_id(&query);
             stream_session(stream, id)
         }
+        // --- the backend office, read-only: rendered dashboard + the parallel ASI OS screen ---
+        ("GET", "/dashboard") => match office_file("fable5-dashboard.html") {
+            Some(b) => write_resp(&mut stream, 200, "text/html; charset=utf-8", &b),
+            None => write_resp(&mut stream, 404, "text/plain", NO_OFFICE),
+        },
+        ("GET", "/asios/screen.png") => match office_file("asios-parallel/screen.png") {
+            Some(b) => write_resp(&mut stream, 200, "image/png", &b),
+            None => write_resp(&mut stream, 404, "text/plain", NO_OFFICE),
+        },
+        ("GET", "/asios/journal.hbp") => match office_file("asios-parallel/asios-parallel.hbp") {
+            Some(b) => write_resp(&mut stream, 200, "text/plain; charset=utf-8", &b),
+            None => write_resp(&mut stream, 404, "text/plain", NO_OFFICE),
+        },
         ("POST", "/win/launch") => {
             let r = launch_windows_env();
             write_resp(&mut stream, 200, "text/plain", r.as_bytes())
@@ -394,6 +407,26 @@ fn b(v: bool) -> u8 {
     u8::from(v)
 }
 
+const NO_OFFICE: &[u8] =
+    b"not found: set $ASOLARIA_OFFICE or ~/.asolaria/office.dir to the backend office directory";
+
+/// The backend office directory (the render source of truth). Resolves from $ASOLARIA_OFFICE,
+/// else ~/.asolaria/office.dir; empty means unconfigured and every office route returns 404.
+fn office_dir() -> Option<std::path::PathBuf> {
+    let d = read_ident("ASOLARIA_OFFICE", "office.dir", "");
+    if d.is_empty() {
+        None
+    } else {
+        Some(std::path::PathBuf::from(d))
+    }
+}
+
+/// Read one fixed file under the office. Only the literal names in the routes reach here,
+/// so no request text is ever joined onto the path.
+fn office_file(rel: &str) -> Option<Vec<u8>> {
+    std::fs::read(office_dir()?.join(rel)).ok()
+}
+
 fn now_unix() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -452,4 +485,23 @@ fn http_get(host: &str, port: u16, path: &str, timeout_ms: u64) -> Option<String
         Some(i) => resp[i + 4..].to_string(),
         None => resp,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn office_routes_use_fixed_names_only() {
+        let dir = std::env::temp_dir().join(format!("asios-office-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("asios-parallel")).unwrap();
+        std::fs::write(dir.join("fable5-dashboard.html"), b"<html>ok</html>").unwrap();
+        std::env::set_var("ASOLARIA_OFFICE", &dir);
+        assert_eq!(
+            office_file("fable5-dashboard.html").unwrap(),
+            b"<html>ok</html>"
+        );
+        assert!(office_file("asios-parallel/screen.png").is_none());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }
