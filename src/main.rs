@@ -7,6 +7,8 @@
 //! Server-Sent-Events, feed stdin over POST. Framework latency is microseconds; the CLIs (claude/codex)
 //! run as commands inside the shells. E=0: it launches only what the human types.
 
+mod win;
+
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -137,6 +139,33 @@ fn handle(mut stream: TcpStream) -> std::io::Result<()> {
             Some(b) => write_resp(&mut stream, 200, "text/plain; charset=utf-8", &b),
             None => write_resp(&mut stream, 404, "text/plain", NO_OFFICE),
         },
+        // --- Windows as a VIEW-ONLY sub-app: the host desktop captured into a pane ---
+        ("GET", "/win/screen.bmp") => {
+            let w = query_num(&query, "w").unwrap_or(1280);
+            match win::capture(w) {
+                Some(b) => write_resp(&mut stream, 200, "image/bmp", &b),
+                None => write_resp(
+                    &mut stream,
+                    404,
+                    "text/plain",
+                    b"no capture on this platform",
+                ),
+            }
+        }
+        ("GET", "/win/screen.hbp") => {
+            let (w, h) = win::screen_size();
+            let row = format!(
+                "WINSCREEN|w={w}|h={h}|windows={}|input=0|json=0
+",
+                u8::from(cfg!(windows))
+            );
+            write_resp(
+                &mut stream,
+                200,
+                "text/plain; charset=utf-8",
+                row.as_bytes(),
+            )
+        }
         ("POST", "/win/launch") => {
             let r = launch_windows_env();
             write_resp(&mut stream, 200, "text/plain", r.as_bytes())
@@ -427,6 +456,13 @@ fn office_file(rel: &str) -> Option<Vec<u8>> {
     std::fs::read(office_dir()?.join(rel)).ok()
 }
 
+fn query_num(query: &str, key: &str) -> Option<i32> {
+    query
+        .split('&')
+        .find_map(|kv| kv.strip_prefix(key)?.strip_prefix('='))
+        .and_then(|v| v.parse().ok())
+}
+
 fn now_unix() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -502,6 +538,8 @@ mod tests {
             b"<html>ok</html>"
         );
         assert!(office_file("asios-parallel/screen.png").is_none());
+        assert_eq!(query_num("w=960&x=1", "w"), Some(960));
+        assert_eq!(query_num("ww=5", "w"), None);
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
