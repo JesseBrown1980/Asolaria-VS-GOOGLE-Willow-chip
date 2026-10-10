@@ -105,14 +105,18 @@ body.light #start .srch{background:rgba(255,255,255,.7)}
 body.light .field{background:#fff}.field:focus{border-color:var(--ac)}
 .muted{color:var(--dim)}.mono{font-family:var(--mono)}
 /* terminal */
-.term{flex:1;min-height:0;display:flex;flex-direction:column;background:#070a10}
-body.light .term{background:#0b1020}
-.tscr{flex:1;min-height:0;overflow:auto;padding:10px 12px 4px;font:13px/1.42 var(--mono);color:#d5e0f3;white-space:pre-wrap;word-break:break-word;user-select:text;cursor:text}
-.tscr .ec{color:#7fe3d6}.tscr .sys{color:#7d8aa6;font-style:italic}
-.tin{display:flex;align-items:center;gap:8px;padding:6px 12px 10px;font:13px var(--mono);color:#d5e0f3}
-.tin .pr{color:var(--gn);white-space:nowrap}
-.tin input{flex:1;background:none;border:0;outline:none;color:#e9f1ff;font:13px var(--mono);caret-color:var(--ac)}
-.tstat{font:11px var(--mono);color:#6d7b98;padding:0 12px 6px;display:flex;justify-content:space-between}
+.term{flex:1;min-height:0;display:flex;flex-direction:column;background:#0b0f17}
+.vt{flex:1;min-height:0;position:relative;overflow:hidden;padding:4px 8px;background:#0b0f17;color:#d5e0f3;font:13px/17px var(--mono);cursor:text;user-select:none}
+.vtrows>div{height:17px;white-space:pre;overflow:hidden}
+.vt .b{font-weight:700}.vt .d{opacity:.6}.vt .i{font-style:italic}.vt .u{text-decoration:underline}.vt .s{text-decoration:line-through}.vt .h{color:transparent!important}
+.vt .cur{outline:1px solid var(--ac);outline-offset:-1px}
+.vt.focus .cur{background:var(--ac)!important;color:#06131a!important;outline:0;animation:blink 1.1s steps(1) infinite}
+@keyframes blink{50%{background:transparent;color:inherit}}
+.vt.sb{box-shadow:inset 0 0 0 1px rgba(255,180,84,.45)}
+.vtin{position:absolute;width:2px;height:17px;opacity:0;border:0;padding:0;margin:0;resize:none;overflow:hidden;background:transparent;color:transparent;caret-color:transparent;z-index:-1}
+.tstat{font:11px var(--mono);color:#6d7b98;padding:4px 10px;display:flex;justify-content:space-between;gap:10px;background:#090c13;border-top:1px solid rgba(140,170,220,.1);white-space:nowrap;overflow:hidden}
+.mbadge{font:700 9.5px var(--mono);padding:1px 6px;border-radius:5px;margin-left:4px;letter-spacing:.06em;vertical-align:1px}
+.mbadge.pty{background:rgba(92,224,160,.18);color:var(--gn)}.mbadge.pipe{background:rgba(255,180,84,.18);color:var(--am)}
 /* monitor */
 .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
 .tile{border:1px solid var(--ln);border-radius:12px;padding:14px;background:rgba(140,170,220,.05);position:relative;overflow:hidden}
@@ -399,41 +403,352 @@ document.addEventListener('keyup',e=>{ if(e.key==='Meta'&&metaAlone){toggleStart
 const RUN={};
 function rowsTable(text){const rows=text.trim().split('\n').filter(Boolean).map(hbp);
  return `<table class=rows><tbody>${rows.map(o=>`<tr><td class=tag>${esc(o._tag)}</td><td>${Object.entries(o).filter(([k])=>k!=='_tag').map(([k,v])=>`<span class=kv>${esc(k)}=<b>${esc(v)}</b></span>`).join('')}</td></tr>`).join('')}</tbody></table>`;}
-/* --- terminal --- */
-function cleanVT(s){return s.replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g,'').replace(/\x1b\[[0-?]*[ -\/]*[@-~]/g,'').replace(/\x1b[PX^_][^\x1b]*\x1b\\/g,'').replace(/\x1b[()][0-9A-Za-z]/g,'').replace(/\x1b[=>78DEHMNOZc]/g,'').replace(/[\x00-\x07\x0b\x0c\x0e-\x1a\x1c-\x1f]/g,'');}
-function applyCR(buf,chunk){ // \r without \n rewinds to the start of the current line; \b erases one char
- let out=buf; for(const seg of chunk.split(/(\r\n|\r|\n|\x08)/)){ if(seg==='\r\n'||seg==='\n') out+='\n'; else if(seg==='\r'){out=out.slice(0,out.lastIndexOf('\n')+1);} else if(seg==='\x08'){ if(out.length&&out[out.length-1]!=='\n') out=out.slice(0,-1);} else out+=seg; } return out;}
-const dec=b=>{try{return new TextDecoder().decode(Uint8Array.from(atob(b),c=>c.charCodeAt(0)))}catch(e){return ''}};
-RUN.term=(w,opts)=>{
- const a=w.app, echo=a.shell==='bash'; // cmd and PowerShell echo their own input over pipes
- w.body.innerHTML=`<div class=term><div class=tscr tabindex=-1><span class=sys>starting ${esc(a.shell)} — a real shell on this machine, opened by your click…</span>\n</div><div class=tin><span class=pr>${a.shell==='bash'?'$':a.shell==='cmd'?'&gt;':'PS&gt;'}</span><input spellcheck=false autocomplete=off aria-label="terminal input" placeholder="type a command, Enter to run · ↑↓ history · Ctrl+C interrupt · Ctrl+L clear"></div><div class=tstat><span class=st1>connecting…</span><span>pipes, not a PTY · full-screen TUIs may not render</span></div></div>`;
- const scr=$('.tscr',w.body), inp=$('input',w.body), st=$('.st1',w.body);
- let text='', sid=null, es=null, hist=store.get('hist.'+a.shell,[]), hi=hist.length, dead=false;
- const MAX=200000;
- const paint=()=>{ if(text.length>MAX) text=text.slice(-MAX); const atEnd=scr.scrollHeight-scr.scrollTop-scr.clientHeight<40; scr.textContent=text; if(atEnd) scr.scrollTop=scr.scrollHeight; };
- const sys=m=>{text+=(text&&!text.endsWith('\n')?'\n':'')+m+'\n'; paint();};
- const send=async d=>{ if(sid===null||dead) return; try{await fetch('/term/input?id='+sid,{method:'POST',body:d});}catch(e){sys('[asi-os] input not delivered: '+e.message);} };
+/* --- terminal: an in-page VT100/xterm emulator over a real pseudo-console --- */
+const VTFG='#d5e0f3', VTBG='#0b0f17';
+const PAL16=['#1d2230','#ff5f6d','#5ce0a0','#f7c46c','#5b9bff','#c792ea','#43e8d8','#c9d4ea','#5c6b88','#ff8a94','#8ff0c0','#ffd98e','#8ab8ff','#ddb3ff','#7ff3e8','#ffffff'];
+const CUBE=[0,95,135,175,215,255];
+function pal(n){ if(n<16) return PAL16[n]; if(n<232){n-=16; return `rgb(${CUBE[(n/36|0)%6]},${CUBE[(n/6|0)%6]},${CUBE[n%6]})`;} const v=8+(n-232)*10; return `rgb(${v},${v},${v})`; }
+function colr(c){ return c>=0x1000000 ? '#'+(c&0xffffff).toString(16).padStart(6,'0') : pal(c&255); }
+const DECGFX={'`':'◆','a':'▒','f':'°','g':'±','h':'␤','i':'␋','j':'┘','k':'┐','l':'┌','m':'└','n':'┼','o':'⎺','p':'⎻','q':'─','r':'⎼','s':'⎽','t':'├','u':'┤','v':'┴','w':'┬','x':'│','y':'≤','z':'≥','{':'π','|':'≠','}':'£','~':'·'};
+function wcw(cp){
+ if(cp<0x300) return 1;
+ if((cp<=0x36f)||(cp>=0x200b&&cp<=0x200f)||(cp>=0xfe00&&cp<=0xfe0f)||(cp>=0x1ab0&&cp<=0x1aff)||(cp>=0x1dc0&&cp<=0x1dff)||(cp>=0x20d0&&cp<=0x20ff)||(cp>=0xe0100&&cp<=0xe01ef)) return 0;
+ if((cp>=0x1100&&cp<=0x115f)||(cp>=0x2e80&&cp<=0xa4cf&&cp!==0x303f)||(cp>=0xac00&&cp<=0xd7a3)||(cp>=0xf900&&cp<=0xfaff)||(cp>=0xfe30&&cp<=0xfe4f)||(cp>=0xff00&&cp<=0xff60)||(cp>=0xffe0&&cp<=0xffe6)||(cp>=0x1f300&&cp<=0x1f64f)||(cp>=0x1f680&&cp<=0x1f6ff)||(cp>=0x1f900&&cp<=0x1f9ff)||(cp>=0x1fa70&&cp<=0x1faff)||(cp>=0x20000&&cp<=0x3fffd)) return 2;
+ return 1;
+}
+class VT{
+ constructor(cols,rows,cb){ this.cb=cb; this.cols=cols; this.rows=rows; this.sb=[]; this.SBMAX=5000; this.vo=0; this.reset(); }
+ mkLine(bg){ const n=this.cols, b=bg===undefined?-1:bg; return {c:Array(n).fill(' '),f:Array(n).fill(-1),b:Array(n).fill(b),a:Array(n).fill(0),w:false}; }
+ reset(){
+  this.fg=-1; this.bg=-1; this.fl=0; this.x=0; this.y=0; this.wrapPend=false; this.top=0; this.bot=this.rows-1;
+  this.alt=false; this.main=null; this.lines=[]; for(let i=0;i<this.rows;i++) this.lines.push(this.mkLine());
+  this.saved=null; this.m={awm:true,cur:true,appCur:false,bpaste:false,ins:false,origin:false,mouse:0,sgrMouse:false,focus:false};
+  this.tabs=new Set(); for(let i=8;i<this.cols;i+=8) this.tabs.add(i);
+  this.g=[false,false]; this.gl=0; this.st=0; this.buf=''; this.prm=''; this.inter=''; this.desig=0; this.last=' ';
+  this.dirty=new Set(); this.all=true;
+ }
+ allDirty(){ this.all=true; }
+ mark(y){ this.dirty.add(y); }
+ /* ---------- parser ---------- */
+ write(s){
+  for(const ch of s){
+   const cp=ch.codePointAt(0);
+   switch(this.st){
+    case 0: if(cp<0x20||cp===0x7f) this.ctrl(cp); else this.print(ch,cp); break;
+    case 1: this.esc(ch,cp); break;
+    case 2: if(cp===0x1b){this.st=1;} else if(cp<0x20){this.ctrl(cp);} else if(cp>=0x40&&cp<=0x7e){this.st=0; this.csi(this.prm,this.inter,ch);} else if(cp>=0x30&&cp<=0x3f){this.prm+=ch;} else if(cp>=0x20&&cp<=0x2f){this.inter+=ch;} else this.st=0; break;
+    case 3: if(cp===7){this.osc(this.buf);this.st=0;} else if(cp===0x1b){this.st=4;} else if(this.buf.length<4096) this.buf+=ch; break;
+    case 4: this.osc(this.buf); if(ch==='\\') this.st=0; else {this.st=1; this.esc(ch,cp);} break;
+    case 5: if(cp===0x1b) this.st=6; break;
+    case 6: this.st=(ch==='\\')?0:5; break;
+    case 7: if(this.desig<2) this.g[this.desig]=(ch==='0'); this.st=0; break;
+    case 8: this.st=0; break;
+   }
+  }
+ }
+ ctrl(cp){
+  switch(cp){
+   case 8: if(this.x>0) this.x--; this.wrapPend=false; break;
+   case 9: { let nx=this.cols-1; for(let i=this.x+1;i<this.cols;i++) if(this.tabs.has(i)){nx=i;break;} this.x=nx; this.wrapPend=false; break; }
+   case 10: case 11: case 12: this.lf(); break;
+   case 13: this.x=0; this.wrapPend=false; break;
+   case 14: this.gl=1; break; case 15: this.gl=0; break;
+   case 0x1b: this.st=1; break;
+  }
+ }
+ esc(ch){
+  this.st=0;
+  switch(ch){
+   case '[': this.st=2; this.prm=''; this.inter=''; break;
+   case ']': this.st=3; this.buf=''; break;
+   case 'P': case 'X': case '^': case '_': this.st=5; break;
+   case '(': this.desig=0; this.st=7; break; case ')': this.desig=1; this.st=7; break;
+   case '*': case '+': case '-': case '.': this.desig=2; this.st=7; break;
+   case '#': case '%': case ' ': this.st=8; break;
+   case '7': this.save(); break; case '8': this.restore(); break;
+   case 'D': this.lf(); break; case 'E': this.x=0; this.lf(); break;
+   case 'M': this.ri(); break; case 'H': this.tabs.add(this.x); break;
+   case 'c': { const sb=this.sb; this.reset(); this.sb=sb; break; }
+   case '=': case '>': case '\\': break;
+  }
+ }
+ osc(s){ const i=s.indexOf(';'); const n=i<0?s:s.slice(0,i), v=i<0?'':s.slice(i+1); if(n==='0'||n==='2') this.cb.title&&this.cb.title(v); }
+ save(){ this.saved={x:this.x,y:this.y,fg:this.fg,bg:this.bg,fl:this.fl,g:[...this.g],gl:this.gl,origin:this.m.origin,wp:this.wrapPend}; }
+ restore(){ const s=this.saved; if(!s){this.x=0;this.y=0;return;} this.mark(this.y); Object.assign(this,{x:Math.min(s.x,this.cols-1),y:Math.min(s.y,this.rows-1),fg:s.fg,bg:s.bg,fl:s.fl,gl:s.gl,wrapPend:s.wp}); this.g=[...s.g]; this.m.origin=s.origin; }
+ /* ---------- printing ---------- */
+ print(ch,cp){
+  if(this.g[this.gl]&&cp<128&&DECGFX[ch]) ch=DECGFX[ch];
+  const w=wcw(cp);
+  if(w===0){ let px=this.wrapPend?this.x:this.x-1; const L=this.lines[this.y]; if(px>=0){ if(L.c[px]===''&&px>0) px--; L.c[px]+=ch; this.mark(this.y);} return; }
+  if(this.wrapPend){ if(this.m.awm){ this.lines[this.y].w=true; this.x=0; this.lf(); } this.wrapPend=false; }
+  if(w===2&&this.x===this.cols-1){ if(this.m.awm){ this.setCell(this.lines[this.y],this.x,' '); this.lines[this.y].w=true; this.x=0; this.lf(); } else return; }
+  const L=this.lines[this.y];
+  if(this.m.ins) this.splice(L,this.x,0,w);
+  this.fixWide(L,this.x); if(w===2) this.fixWide(L,this.x+1);
+  this.setCell(L,this.x,ch); if(w===2) this.setCell(L,this.x+1,'');
+  this.last=ch; this.mark(this.y);
+  const nx=this.x+w; if(nx>=this.cols){ this.x=this.cols-1; this.wrapPend=true; } else this.x=nx;
+ }
+ setCell(L,x,ch){ L.c[x]=ch; L.f[x]=this.fg; L.b[x]=this.bg; L.a[x]=this.fl; }
+ fixWide(L,x){ if(x<0||x>=this.cols) return; if(L.c[x]===''&&x>0) L.c[x-1]=' '; if(x+1<this.cols&&L.c[x+1]==='') L.c[x+1]=' '; }
+ splice(L,x,del,ins){ for(const k of ['c','f','b','a']){ const fill=k==='c'?' ':k==='a'?0:k==='b'?this.bg:-1; const arr=L[k]; arr.splice(x,del,...Array(ins).fill(fill)); if(arr.length>this.cols) arr.length=this.cols; while(arr.length<this.cols) arr.push(fill); } }
+ erase(L,a,b){ a=Math.max(0,a); b=Math.min(this.cols,b); if(a>=b) return; if(L.c[a]===''&&a>0) L.c[a-1]=' '; if(b<this.cols&&L.c[b]==='') L.c[b]=' '; for(let x=a;x<b;x++){L.c[x]=' ';L.f[x]=-1;L.b[x]=this.bg;L.a[x]=0;} }
+ /* ---------- scrolling ---------- */
+ pushSB(L){ this.sb.push(L); if(this.sb.length>this.SBMAX) this.sb.shift(); else if(this.vo>0) this.vo=Math.min(this.vo+1,this.sb.length); }
+ scrollUp(n){ n=Math.min(n,this.bot-this.top+1); for(let i=0;i<n;i++){ const t=this.lines.splice(this.top,1)[0]; if(!this.alt&&this.top===0) this.pushSB(t); this.lines.splice(this.bot,0,this.mkLine(this.bg)); } this.allDirty(); }
+ scrollDown(n){ n=Math.min(n,this.bot-this.top+1); for(let i=0;i<n;i++){ this.lines.splice(this.bot,1); this.lines.splice(this.top,0,this.mkLine(this.bg)); } this.allDirty(); }
+ lf(){ this.wrapPend=false; if(this.y===this.bot) this.scrollUp(1); else if(this.y<this.rows-1){ this.mark(this.y); this.y++; } }
+ ri(){ this.wrapPend=false; if(this.y===this.top) this.scrollDown(1); else if(this.y>0){ this.mark(this.y); this.y--; } }
+ /* ---------- CSI ---------- */
+ go(x,y){ this.mark(this.y); this.x=Math.max(0,Math.min(this.cols-1,x)); this.y=Math.max(0,Math.min(this.rows-1,y)); this.wrapPend=false; }
+ csi(raw,inter,f){
+  let pre=''; if(raw&&'<=>?'.includes(raw[0])){pre=raw[0]; raw=raw.slice(1);}
+  const P=raw===''?[]:raw.split(';').map(x=>parseInt(x.split(':')[0],10));
+  const p=(i,d=1)=>{const v=P[i]; return (v===undefined||isNaN(v)||v===0)?d:v;};
+  const z=i=>{const v=P[i]; return (v===undefined||isNaN(v))?0:v;};
+  if(inter){ if(inter==='!'&&f==='p') this.softReset(); return; }
+  if(pre==='?'){ if(f==='h'||f==='l') for(const n of P) this.decset(n,f==='h'); else if(f==='n'&&z(0)===6) this.reply(`\x1b[?${this.y+1};${this.x+1}R`); return; }
+  if(pre){ if(f==='c'&&pre==='>') this.reply('\x1b[>0;276;0c'); return; }
+  const L=this.lines[this.y];
+  switch(f){
+   case '@': this.splice(L,this.x,0,Math.min(p(0),this.cols-this.x)); this.mark(this.y); break;
+   case 'A': this.go(this.x,Math.max(this.y-p(0),this.y>=this.top?this.top:0)); break;
+   case 'B': case 'e': this.go(this.x,Math.min(this.y+p(0),this.y<=this.bot?this.bot:this.rows-1)); break;
+   case 'C': case 'a': this.go(this.x+p(0),this.y); break;
+   case 'D': this.go(this.x-p(0),this.y); break;
+   case 'E': this.go(0,Math.min(this.y+p(0),this.bot)); break;
+   case 'F': this.go(0,Math.max(this.y-p(0),this.top)); break;
+   case 'G': case '`': this.go(p(0)-1,this.y); break;
+   case 'H': case 'f': { const oy=this.m.origin?this.top:0; this.go(p(1)-1,Math.min(oy+p(0)-1,this.m.origin?this.bot:this.rows-1)); break; }
+   case 'd': this.go(this.x,(this.m.origin?this.top:0)+p(0)-1); break;
+   case 'I': for(let k=0;k<p(0);k++) this.ctrl(9); break;
+   case 'Z': for(let k=0;k<p(0);k++){ let nx=0; for(let i=this.x-1;i>0;i--) if(this.tabs.has(i)){nx=i;break;} this.x=nx; } break;
+   case 'J': { const m=z(0);
+     if(m===0){ this.erase(L,this.x,this.cols); for(let y=this.y+1;y<this.rows;y++) this.erase(this.lines[y],0,this.cols); }
+     else if(m===1){ this.erase(L,0,this.x+1); for(let y=0;y<this.y;y++) this.erase(this.lines[y],0,this.cols); }
+     else if(m===2){ for(const l of this.lines) this.erase(l,0,this.cols); }
+     else if(m===3){ this.sb=[]; this.vo=0; }
+     this.allDirty(); break; }
+   case 'K': { const m=z(0); if(m===0) this.erase(L,this.x,this.cols); else if(m===1) this.erase(L,0,this.x+1); else this.erase(L,0,this.cols); this.mark(this.y); break; }
+   case 'X': this.erase(L,this.x,this.x+p(0)); this.mark(this.y); break;
+   case 'P': this.splice(L,this.x,Math.min(p(0),this.cols-this.x),0); this.mark(this.y); break;
+   case 'L': if(this.y>=this.top&&this.y<=this.bot){ const n=Math.min(p(0),this.bot-this.y+1); for(let i=0;i<n;i++){ this.lines.splice(this.bot,1); this.lines.splice(this.y,0,this.mkLine(this.bg)); } this.x=0; this.allDirty(); } break;
+   case 'M': if(this.y>=this.top&&this.y<=this.bot){ const n=Math.min(p(0),this.bot-this.y+1); for(let i=0;i<n;i++){ this.lines.splice(this.y,1); this.lines.splice(this.bot,0,this.mkLine(this.bg)); } this.x=0; this.allDirty(); } break;
+   case 'S': this.scrollUp(p(0)); break;
+   case 'T': this.scrollDown(p(0)); break;
+   case 'b': for(let k=0;k<Math.min(p(0),4096);k++) this.print(this.last,this.last.codePointAt(0)); break;
+   case 'c': if(z(0)===0) this.reply('\x1b[?62;22c'); break;
+   case 'n': if(z(0)===5) this.reply('\x1b[0n'); else if(z(0)===6) this.reply(`\x1b[${this.y+1};${this.x+1}R`); break;
+   case 'r': { const t=p(0)-1, b=(P[1]?P[1]:this.rows)-1; if(t<b&&b<this.rows){ this.top=t; this.bot=b; this.go(0,this.m.origin?t:0); } break; }
+   case 's': this.save(); break;
+   case 'u': this.restore(); break;
+   case 'g': if(z(0)===0) this.tabs.delete(this.x); else if(z(0)===3) this.tabs.clear(); break;
+   case 'h': case 'l': for(const n of P) if(n===4) this.m.ins=(f==='h'); break;
+   case 'm': this.sgr(raw); break;
+  }
+ }
+ softReset(){ Object.assign(this.m,{ins:false,origin:false,awm:true,cur:true,appCur:false}); this.top=0; this.bot=this.rows-1; this.fg=-1; this.bg=-1; this.fl=0; this.saved=null; }
+ reply(s){ this.cb.reply&&this.cb.reply(s); }
+ decset(n,on){
+  switch(n){
+   case 1: this.m.appCur=on; break;
+   case 6: this.m.origin=on; this.go(0,on?this.top:0); break;
+   case 7: this.m.awm=on; break;
+   case 25: this.m.cur=on; this.mark(this.y); break;
+   case 47: case 1047: this.setAlt(on); break;
+   case 1048: on?this.save():this.restore(); break;
+   case 1049: if(on){ this.save(); this.setAlt(true); for(const l of this.lines) this.erase(l,0,this.cols); } else { this.setAlt(false); this.restore(); } break;
+   case 9: case 1000: case 1002: case 1003: this.m.mouse=on?n:(this.m.mouse===n?0:this.m.mouse); break;
+   case 1006: this.m.sgrMouse=on; break;
+   case 1004: this.m.focus=on; break;
+   case 2004: this.m.bpaste=on; break;
+   case 9001: this.m.w32=on; break;
+  }
+ }
+ setAlt(on){ if(on===this.alt) return; if(on){ this.main=this.lines; this.lines=[]; for(let i=0;i<this.rows;i++) this.lines.push(this.mkLine()); } else { this.lines=this.main; this.main=null; } this.alt=on; this.top=0; this.bot=this.rows-1; this.vo=0; this.allDirty(); }
+ sgr(raw){
+  const t=raw===''?[[0]]:raw.split(';').map(s=>s.split(':').map(v=>v===''?-1:parseInt(v,10)));
+  for(let i=0;i<t.length;i++){
+   const s=t[i], n=(s[0]<0||isNaN(s[0]))?0:s[0];
+   if(n===38||n===48||n===58){ let col=null;
+    if(s.length>1){ if(s[1]===5) col=s[2]; else if(s[1]===2){ const v=s.length>=6?s.slice(3):s.slice(2); col=0x1000000|((v[0]&255)<<16)|((v[1]&255)<<8)|(v[2]&255); } }
+    else { const md=t[i+1]&&t[i+1][0]; if(md===5){ col=t[i+2]?t[i+2][0]:0; i+=2; } else if(md===2){ const g=k=>((t[i+k]||[0])[0]&255); col=0x1000000|(g(2)<<16)|(g(3)<<8)|g(4); i+=4; } }
+    if(col!==null&&col>=0){ if(n===38) this.fg=col; else if(n===48) this.bg=col; } continue; }
+   switch(true){
+    case n===0: this.fg=-1; this.bg=-1; this.fl=0; break;
+    case n===1: this.fl|=1; break; case n===2: this.fl|=2; break; case n===3: this.fl|=4; break;
+    case n===4: if(s.length>1&&s[1]===0) this.fl&=~8; else this.fl|=8; break;
+    case n===5||n===6: break; case n===7: this.fl|=16; break; case n===8: this.fl|=32; break; case n===9: this.fl|=64; break;
+    case n===21: this.fl|=8; break; case n===22: this.fl&=~3; break; case n===23: this.fl&=~4; break; case n===24: this.fl&=~8; break;
+    case n===27: this.fl&=~16; break; case n===28: this.fl&=~32; break; case n===29: this.fl&=~64; break;
+    case n>=30&&n<=37: this.fg=n-30; break; case n===39: this.fg=-1; break;
+    case n>=40&&n<=47: this.bg=n-40; break; case n===49: this.bg=-1; break;
+    case n>=90&&n<=97: this.fg=n-90+8; break; case n>=100&&n<=107: this.bg=n-100+8; break;
+   }
+  }
+ }
+ /* ---------- resize (rows keep the cursor on screen; the program repaints) ---------- */
+ resize(c,r){
+  if(c===this.cols&&r===this.rows) return;
+  const fixW=L=>{ for(const k of ['c','f','b','a']){ const fill=k==='c'?' ':k==='a'?0:-1; const a=L[k]; if(a.length>c) a.length=c; else while(a.length<c) a.push(fill);} if(L.c[c-1]==='') L.c[c-1]=' '; };
+  const blank=L=>L.c.every(ch=>ch===' '||ch==='');
+  this.cols=c;
+  const fit=(lines,live)=>{
+   while(lines.length>r){ if(live&&this.y<lines.length-1&&blank(lines[lines.length-1])) lines.pop(); else { const t=lines.shift(); if(live&&!this.alt) this.pushSB(t); if(live) this.y=Math.max(0,this.y-1); } }
+   while(lines.length<r){ if(live&&!this.alt&&this.sb.length){ lines.unshift(this.sb.pop()); this.y++; } else lines.push(this.mkLine()); }
+   for(const L of lines) fixW(L);
+  };
+  this.rows=r;
+  fit(this.lines,true); if(this.main) fit(this.main,false);
+  this.x=Math.min(this.x,c-1); this.y=Math.min(this.y,r-1); this.top=0; this.bot=r-1; this.wrapPend=false;
+  this.tabs=new Set(); for(let i=8;i<c;i+=8) this.tabs.add(i);
+  this.vo=Math.min(this.vo,this.sb.length); this.allDirty();
+ }
+ /* ---------- view ---------- */
+ viewLine(i){ if(this.vo===0) return this.lines[i]; const idx=this.sb.length-this.vo+i; return idx<this.sb.length?this.sb[idx]:this.lines[idx-this.sb.length]; }
+}
+const escT=s=>s.replace(/[&<>]/g,c=>c==='&'?'&amp;':c==='<'?'&lt;':'&gt;');
+function vtSpan(txt,fc,bc,a,wide,cur){
+ let st=''; if(fc) st+='color:'+fc+';'; if(bc) st+='background:'+bc+';'; if(wide) st+='display:inline-block;width:calc(var(--cw)*2);';
+ let cl=''; if(a&1)cl+=' b'; if(a&2)cl+=' d'; if(a&4)cl+=' i'; if(a&8)cl+=' u'; if(a&64)cl+=' s'; if(a&32)cl+=' h'; if(cur)cl+=' cur';
+ if(!st&&!cl) return escT(txt);
+ return `<span${cl?` class="${cl.trim()}"`:''}${st?` style="${st}"`:''}>${escT(txt)}</span>`;
+}
+function vtRowHTML(t,L,i,curX,sel){
+ if(!L) return '';
+ let h='', run='', key=null, rf=null, rb=null, ra=0;
+ const flush=()=>{ if(run){ h+=vtSpan(run,rf,rb,ra,false,false); run=''; } key=null; };
+ for(let x=0;x<t.cols;x++){
+  let ch=L.c[x]; if(ch===undefined) ch=' '; if(ch==='') continue;
+  let f=L.f[x]??-1, b=L.b[x]??-1; const a=L.a[x]||0;
+  const wide=x+1<t.cols&&L.c[x+1]==='';
+  let inv=!!(a&16); if(sel&&sel(i,x)) inv=!inv;
+  if((a&1)&&f>=0&&f<8) f+=8;
+  let fc=f<0?null:colr(f), bc=b<0?null:colr(b);
+  if(inv){ const tf=fc||VTFG, tb=bc||VTBG; fc=tb; bc=tf; }
+  const isCur=curX===x;
+  if(wide||isCur){ flush(); h+=vtSpan(ch,fc,bc,a,wide,isCur); continue; }
+  const k=(fc||'')+'|'+(bc||'')+'|'+(a&111);
+  if(k!==key){ flush(); key=k; rf=fc; rb=bc; ra=a; }
+  run+=ch;
+ }
+ flush();
+ return h;
+}
+RUN.term=(w)=>{
+ const a=w.app;
+ w.body.innerHTML=`<div class=term><div class=vt tabindex=-1><div class=vtrows></div><textarea class=vtin spellcheck=false autocomplete=off autocapitalize=off aria-label="terminal"></textarea></div><div class=tstat><span class=st1>starting ${esc(a.shell)}…</span><span class=st2>Ctrl+Shift+C copy · Ctrl+Shift+V or right-click paste · Shift+PgUp scrollback</span></div></div>`;
+ const vtEl=$('.vt',w.body), rowsEl=$('.vtrows',w.body), ta=$('.vtin',w.body), st=$('.st1',w.body);
+ /* measure one cell */
+ const probe=document.createElement('span'); probe.textContent='MMMMMMMMMM'; probe.style.cssText='position:absolute;visibility:hidden;white-space:pre'; rowsEl.appendChild(probe);
+ const cw=probe.getBoundingClientRect().width/10||7.8; probe.remove(); const lh=17;
+ vtEl.style.setProperty('--cw',cw+'px');
+ const fit=()=>{ const r=vtEl.getBoundingClientRect(); return [Math.max(10,Math.floor((r.width-16)/cw)),Math.max(5,Math.floor((r.height-8)/lh))]; };
+ let [cols,rows]=fit();
+ let sid=null, dead=false, mode='…', sel=null, selecting=false, focused=false, rowEls=[], lastCur=-1, raf=0, rzT=0;
+ let q='', busy=false;
+ const flushQ=async()=>{ if(busy||!q||sid===null) return; busy=true; const d=q; q=''; try{ await fetch('/term/input?id='+sid,{method:'POST',body:d}); }catch(e){} busy=false; if(q) flushQ(); };
+ const send=d=>{ if(dead){ closeWin(w.id); return; } q+=d; flushQ(); };
+ const t=new VT(cols,rows,{reply:s=>send(s),title:s=>{ if(s){ w.title=s.slice(0,80); $('.tt',w.el).firstChild.nodeValue=w.title; renderTasks(); } }});
+ const buildRows=()=>{ rowsEl.innerHTML=''; rowEls=[]; for(let i=0;i<t.rows;i++){ const d=document.createElement('div'); rowsEl.appendChild(d); rowEls.push(d);} t.allDirty(); };
+ const inSel=()=>{ if(!sel) return null; let [p,q2]=[sel.a,sel.b]; if(q2.r<p.r||(q2.r===p.r&&q2.c<p.c)) [p,q2]=[q2,p]; if(p.r===q2.r&&p.c===q2.c) return null; return (r,c)=>(r>p.r||(r===p.r&&c>=p.c))&&(r<q2.r||(r===q2.r&&c<q2.c)); };
+ const render=()=>{ raf=0; const sf=inSel(); const showCur=t.m.cur&&t.vo===0&&!dead;
+  if(lastCur!==t.y) { t.mark(lastCur); t.mark(t.y); }
+  for(let i=0;i<t.rows;i++){ if(!t.all&&!t.dirty.has(i)&&!sf) continue; const el=rowEls[i]; if(!el) continue;
+   el.innerHTML=vtRowHTML(t,t.viewLine(i),i,showCur&&i===t.y?t.x:-1,sf); }
+  t.dirty.clear(); t.all=false; lastCur=t.y;
+  ta.style.left=(8+t.x*cw)+'px'; ta.style.top=(4+t.y*lh)+'px';
+  vtEl.classList.toggle('sb',t.vo>0); };
+ const schedule=()=>{ if(!raf) raf=requestAnimationFrame(render); };
+ buildRows(); schedule();
+ /* resize -> grid + pseudo-console */
+ const ro=new ResizeObserver(()=>{ const [c,r]=fit(); if(c===t.cols&&r===t.rows) return; t.resize(c,r); buildRows(); schedule();
+  clearTimeout(rzT); rzT=setTimeout(()=>{ if(sid!==null) fetch(`/term/resize?id=${sid}&cols=${t.cols}&rows=${t.rows}`,{method:'POST'}).catch(()=>{}); st.textContent=`${a.shell} · session ${sid} · ${mode} · ${t.cols}×${t.rows}`; },120); });
+ ro.observe(vtEl); w.cleanup.push(()=>ro.disconnect());
+ /* spawn + stream */
+ const dec=new TextDecoder('utf-8');
  (async()=>{
-  try{ sid=(await (await fetch('/term/spawn',{method:'POST',body:a.shell})).text()).trim(); }
-  catch(e){ sys('[asi-os] could not reach the front-end server: '+e.message); st.textContent='offline'; return; }
-  text=''; setSub(w,'#'+sid); st.textContent=a.shell+' · session '+sid+' · live';
-  es=new EventSource('/term/stream?id='+sid);
-  es.onmessage=e=>{ text=applyCR(text,cleanVT(dec(e.data))); paint(); };
-  es.addEventListener('end',()=>{dead=true; sys('[session ended]'); st.textContent='ended'; es.close();});
-  es.onerror=()=>{ if(!dead) st.textContent='stream reconnecting…'; };
-  if(a.cmdline){ setTimeout(()=>{ sys('› '+a.cmdline); send(a.cmdline+'\r\n'); },700); }
+  let row='';
+  try{ row=await (await fetch(`/term/spawn?cols=${t.cols}&rows=${t.rows}`,{method:'POST',body:a.shell})).text(); }
+  catch(e){ t.write('\x1b[31m[asi-os] front-end server unreachable: '+e.message+'\x1b[0m\r\n'); schedule(); st.textContent='offline'; return; }
+  const o=hbp(row.trim()); sid=o.id; mode=o.mode||'?';
+  setSub(w,''); $('.tt small',w.el).innerHTML=`#${esc(sid)} <b class="mbadge ${mode==='PTY'?'pty':'pipe'}">${esc(mode)}</b>`;
+  st.textContent=`${a.shell} · session ${sid} · ${mode} · ${t.cols}×${t.rows}`;
+  const es=new EventSource('/term/stream?id='+sid); let first=true;
+  es.onmessage=e=>{ const bin=atob(e.data), u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i);
+   t.write(dec.decode(u,{stream:true})); schedule();
+   if(first&&a.cmdline){ first=false; setTimeout(()=>send(a.cmdline+'\r'),900); } };
+  es.addEventListener('end',()=>{ dead=true; es.close(); t.write('\r\n\x1b[90m[process exited — press any key to close this window]\x1b[0m'); schedule(); st.textContent=`${a.shell} · session ${sid} · ended`; });
+  w.cleanup.push(()=>{ es.close(); fetch('/term/kill?id='+sid,{method:'POST'}).catch(()=>{}); });
  })();
- inp.addEventListener('keydown',e=>{
-  if(e.key==='Enter'){e.preventDefault(); const v=inp.value; inp.value=''; if(v.trim()){hist=hist.filter(h=>h!==v); hist.push(v); hist=hist.slice(-200); store.set('hist.'+a.shell,hist);} hi=hist.length; if(echo){text+='› '+v+'\n'; paint();} send(v+'\r\n');}
-  else if(e.key==='ArrowUp'){e.preventDefault(); if(hi>0){hi--; inp.value=hist[hi]||'';}}
-  else if(e.key==='ArrowDown'){e.preventDefault(); if(hi<hist.length){hi++; inp.value=hist[hi]||'';}}
-  else if(e.ctrlKey&&(e.key==='c'||e.key==='C')&&inp.selectionStart===inp.selectionEnd&&!getSelection().toString()){e.preventDefault(); send('\x03'); sys('^C');}
-  else if(e.ctrlKey&&(e.key==='l'||e.key==='L')){e.preventDefault(); text=''; paint();}
+ /* keyboard */
+ const paste=txt=>{ if(!txt) return; txt=txt.replace(/\r?\n/g,'\r'); if(t.m.bpaste) txt='\x1b[200~'+txt+'\x1b[201~'; t.vo=0; send(txt); };
+ const selText=()=>{ const sf=inSel(); if(!sf) return ''; let out=[]; for(let i=0;i<t.rows;i++){ const L=t.viewLine(i); if(!L) continue; let s=''; let any=false; for(let x=0;x<t.cols;x++){ if(sf(i,x)){ any=true; const c=L.c[x]; if(c!=='') s+=c===undefined?' ':c; } } if(any) out.push({s:s.replace(/\s+$/,''),w:L.w}); } return out.map((o,i)=>o.s+(i<out.length-1&&!o.w?'\n':'')).join(''); };
+ const copy=()=>{ const s=selText(); if(!s) return false; (navigator.clipboard?navigator.clipboard.writeText(s):Promise.reject()).then(()=>toast('Copied',s.length+' characters'),()=>toast('Copy','clipboard not available here')); sel=null; t.allDirty(); schedule(); return true; };
+ const doPaste=()=>{ if(navigator.clipboard&&navigator.clipboard.readText) navigator.clipboard.readText().then(paste,()=>toast('Paste','clipboard read was not allowed — use Ctrl+V inside the app or allow clipboard access')); };
+ ta.addEventListener('keydown',e=>{
+  if(e.isComposing||e.key==='Process') return;
+  if(dead){ e.preventDefault(); closeWin(w.id); return; }
+  const cs=e.ctrlKey&&e.shiftKey&&!e.altKey;
+  if(cs&&e.code==='KeyC'){ e.preventDefault(); copy(); return; }
+  if(cs&&e.code==='KeyV'){ e.preventDefault(); doPaste(); return; }
+  if(e.shiftKey&&!e.ctrlKey&&(e.key==='PageUp'||e.key==='PageDown')){ e.preventDefault(); if(!t.alt){ t.vo=Math.max(0,Math.min(t.sb.length,t.vo+(e.key==='PageUp'?1:-1)*(t.rows-1))); t.allDirty(); schedule(); } return; }
+  if(e.ctrlKey&&!e.shiftKey&&!e.altKey&&e.code==='KeyC'&&inSel()){ e.preventDefault(); copy(); return; }
+  const altGr=e.getModifierState&&e.getModifierState('AltGraph');
+  const mod=1+(e.shiftKey?1:0)+(e.altKey?2:0)+(e.ctrlKey?4:0);
+  const cur=c=>mod>1?`\x1b[1;${mod}${c}`:(t.m.appCur?`\x1bO${c}`:`\x1b[${c}`);
+  const til=n=>mod>1?`\x1b[${n};${mod}~`:`\x1b[${n}~`;
+  const FN={F1:'P',F2:'Q',F3:'R',F4:'S'}, FT={F5:15,F6:17,F7:18,F8:19,F9:20,F10:21,F11:23,F12:24};
+  let s=null;
+  switch(e.key){
+   case 'ArrowUp': s=cur('A'); break; case 'ArrowDown': s=cur('B'); break; case 'ArrowRight': s=cur('C'); break; case 'ArrowLeft': s=cur('D'); break;
+   case 'Home': s=cur('H'); break; case 'End': s=cur('F'); break;
+   case 'Insert': s=til(2); break; case 'Delete': s=til(3); break; case 'PageUp': s=til(5); break; case 'PageDown': s=til(6); break;
+   case 'Enter': s=e.altKey?'\x1b\r':'\r'; break;
+   case 'Backspace': s=e.ctrlKey?'\x08':(e.altKey?'\x1b\x7f':'\x7f'); break;
+   case 'Tab': s=e.shiftKey?'\x1b[Z':'\t'; break;
+   case 'Escape': s='\x1b'; break;
+   default:
+    if(FN[e.key]) s=mod>1?`\x1b[1;${mod}${FN[e.key]}`:`\x1bO${FN[e.key]}`;
+    else if(FT[e.key]) s=til(FT[e.key]);
+  }
+  if(s===null&&!altGr&&e.ctrlKey&&!e.metaKey&&e.key.length===1){
+   const k=e.key, c=k.toUpperCase().charCodeAt(0);
+   if(t.m.w32&&c>=65&&c<=90&&!e.altKey){ // conhost asked for win32-input-mode: send Ctrl+letter as a real key event so raw-mode apps (claude, codex, node TUIs) see it
+    const SC={A:30,B:48,C:46,D:32,E:18,F:33,G:34,H:35,I:23,J:36,K:37,L:38,M:50,N:49,O:24,P:25,Q:16,R:19,S:31,T:20,U:22,V:47,W:17,X:45,Y:21,Z:44}, ch=String.fromCharCode(c);
+    s=`\x1b[${c};${SC[ch]};${c-64};1;8;1_\x1b[${c};${SC[ch]};${c-64};0;8;1_`; }
+   else if(c>=64&&c<=95) s=String.fromCharCode(c-64); else if(k===' '||k==='2') s='\x00'; else if(k==='/'||k==='7'||k==='-') s='\x1f'; else if(k==='3') s='\x1b'; else if(k==='4') s='\x1c'; else if(k==='5') s='\x1d'; else if(k==='6') s='\x1e'; else if(k==='8') s='\x7f';
+   if(s!==null&&e.altKey) s='\x1b'+s;
+  } else if(s===null&&!altGr&&e.altKey&&!e.ctrlKey&&!e.metaKey&&e.key.length===1) s='\x1b'+e.key;
+  if(s!==null){ e.preventDefault(); e.stopPropagation(); if(t.vo){t.vo=0;t.allDirty();schedule();} send(s); }
  });
- scr.addEventListener('mouseup',()=>{ if(!getSelection().toString()) inp.focus(); });
- w.onfocus=()=>setTimeout(()=>{ if(!getSelection().toString()) inp.focus(); },0);
- w.cleanup.push(()=>{ if(es) es.close(); if(sid!==null) fetch('/term/kill?id='+sid,{method:'POST'}).catch(()=>{}); });
- inp.focus();
+ ta.addEventListener('compositionend',e=>{ if(e.data) send(e.data); ta.value=''; });
+ ta.addEventListener('input',e=>{ if(e.isComposing) return; const v=ta.value; ta.value=''; if(v){ if(t.vo){t.vo=0;t.allDirty();schedule();} send(v); } });
+ ta.addEventListener('paste',e=>{ e.preventDefault(); paste(e.clipboardData.getData('text')); });
+ ta.addEventListener('focus',()=>{ focused=true; vtEl.classList.add('focus'); if(t.m.focus) send('\x1b[I'); t.mark(t.y); schedule(); });
+ ta.addEventListener('blur',()=>{ focused=false; vtEl.classList.remove('focus'); if(t.m.focus&&!dead&&sid!==null) send('\x1b[O'); t.mark(t.y); schedule(); });
+ /* mouse: selection, wheel, xterm mouse reporting */
+ const cell=e=>{ const r=rowsEl.getBoundingClientRect(); return {c:Math.max(0,Math.min(t.cols-1,Math.floor((e.clientX-r.left)/cw))), r:Math.max(0,Math.min(t.rows-1,Math.floor((e.clientY-r.top)/lh)))}; };
+ const report=(btn,p,press,motion)=>{ if(t.m.sgrMouse) send(`\x1b[<${btn+(motion?32:0)};${p.c+1};${p.r+1}${press?'M':'m'}`); else if(p.c<223&&p.r<223) send('\x1b[M'+String.fromCharCode(32+(press?btn+(motion?32:0):3),33+p.c,33+p.r)); };
+ const tracking=e=>t.m.mouse&&!e.shiftKey&&t.vo===0;
+ let downBtn=-1;
+ vtEl.addEventListener('mousedown',e=>{ if(e.button===2) return; e.preventDefault(); ta.focus({preventScroll:true});
+  const p=cell(e);
+  if(tracking(e)){ downBtn=e.button; report(e.button,p,true,false); return; }
+  if(e.button!==0) return;
+  if(e.detail===2){ const L=t.viewLine(p.r); if(L){ let a2=p.c,b2=p.c; const wc=ch=>ch&&/[\w.\-\/~:@]/.test(ch); while(a2>0&&wc(L.c[a2-1])) a2--; while(b2<t.cols-1&&wc(L.c[b2+1])) b2++; sel={a:{r:p.r,c:a2},b:{r:p.r,c:b2+1}}; t.allDirty(); schedule(); } return; }
+  sel={a:p,b:p}; selecting=true; t.allDirty(); schedule(); });
+ const onMove=e=>{ if(downBtn>=0&&(t.m.mouse===1002||t.m.mouse===1003)){ report(downBtn,cell(e),true,true); return; } if(!selecting) return; sel.b=cell(e); t.allDirty(); schedule(); };
+ const onUp=e=>{ if(downBtn>=0){ report(downBtn,cell(e),false,false); downBtn=-1; return; } if(!selecting) return; selecting=false; if(sel&&sel.a.r===sel.b.r&&sel.a.c===sel.b.c){ sel=null; t.allDirty(); schedule(); } };
+ addEventListener('mousemove',onMove); addEventListener('mouseup',onUp); w.cleanup.push(()=>{ removeEventListener('mousemove',onMove); removeEventListener('mouseup',onUp); });
+ vtEl.addEventListener('wheel',e=>{ e.preventDefault(); const up=e.deltaY<0, n=Math.max(1,Math.min(10,Math.round(Math.abs(e.deltaY)/40)));
+  if(tracking(e)){ const p=cell(e); for(let i=0;i<n;i++) report(up?64:65,p,true,false); return; }
+  if(t.alt){ for(let i=0;i<n;i++) send(t.m.appCur?(up?'\x1bOA':'\x1bOB'):(up?'\x1b[A':'\x1b[B')); return; }
+  t.vo=Math.max(0,Math.min(t.sb.length,t.vo+(up?3:-3)*n)); t.allDirty(); schedule(); },{passive:false});
+ vtEl.addEventListener('contextmenu',e=>{ e.preventDefault(); e.stopPropagation(); if(!copy()) doPaste(); ta.focus(); });
+ w.onfocus=()=>setTimeout(()=>ta.focus({preventScroll:true}),0);
+ w.onresize=()=>{};
+ ta.focus({preventScroll:true});
 };
 /* --- system monitor --- */
 RUN.mon=w=>{

@@ -8,32 +8,19 @@
 //! run as commands inside the shells. E=0: it launches only what the human types.
 
 mod fsr;
+#[cfg(windows)]
+mod pty_win;
+mod term;
 mod win;
 
-use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::process::{Child, ChildStdin, Command, Stdio};
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::process::Command;
 use std::thread;
 use std::time::Duration;
 
 const BIND: &str = "127.0.0.1:4600";
 const INDEX_HTML: &str = include_str!("index.html");
-
-struct Session {
-    stdin: Mutex<Option<ChildStdin>>,
-    out: Arc<Mutex<Vec<u8>>>,
-    child: Mutex<Option<Child>>,
-    label: String,
-}
-
-fn sessions() -> &'static Mutex<HashMap<u64, Arc<Session>>> {
-    static S: OnceLock<Mutex<HashMap<u64, Arc<Session>>>> = OnceLock::new();
-    S.get_or_init(|| Mutex::new(HashMap::new()))
-}
-static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 
 fn main() {
     // Loopback only. $ASOLARIA_ASIOS_PORT lets a new build run beside the live one for a
@@ -110,32 +97,34 @@ fn handle(mut stream: TcpStream) -> std::io::Result<()> {
         }
         ("POST", "/term/spawn") => {
             let shell = String::from_utf8_lossy(&body).trim().to_string();
-            let id = spawn_session(&shell);
-            write_resp(&mut stream, 200, "text/plain", id.to_string().as_bytes())
+            let cols = query_num(&query, "cols").unwrap_or(100);
+            let rows = query_num(&query, "rows").unwrap_or(30);
+            let (id, mode) = term::spawn(&shell, cols, rows);
+            let (c, r) = term::clamp_size(cols, rows);
+            let row = format!("TERM|id={id}|mode={mode}|cols={c}|rows={r}|json=0\n");
+            write_resp(&mut stream, 200, "text/plain", row.as_bytes())
         }
         ("POST", "/term/input") => {
+            let ok = term::input(query_id(&query), &body);
+            write_resp(&mut stream, 200, "text/plain", if ok { b"ok" } else { b"no-session" })
+        }
+        ("POST", "/term/resize") => {
             let id = query_id(&query);
-            if let Some(sess) = sessions().lock().unwrap().get(&id).cloned() {
-                if let Some(si) = sess.stdin.lock().unwrap().as_mut() {
-                    let _ = si.write_all(&body);
-                    let _ = si.flush();
-                }
-            }
-            write_resp(&mut stream, 200, "text/plain", b"ok")
+            let cols = query_num(&query, "cols").unwrap_or(80);
+            let rows = query_num(&query, "rows").unwrap_or(24);
+            let (applied, mode) = term::resize(id, cols, rows);
+            let (c, r) = term::clamp_size(cols, rows);
+            let row = format!(
+                "TERMRESIZE|id={id}|cols={c}|rows={r}|mode={mode}|applied={}|json=0\n",
+                u8::from(applied)
+            );
+            write_resp(&mut stream, 200, "text/plain", row.as_bytes())
         }
         ("POST", "/term/kill") => {
-            let id = query_id(&query);
-            if let Some(sess) = sessions().lock().unwrap().remove(&id) {
-                if let Some(ch) = sess.child.lock().unwrap().as_mut() {
-                    let _ = ch.kill();
-                }
-            }
+            term::kill(query_id(&query));
             write_resp(&mut stream, 200, "text/plain", b"ok")
         }
-        ("GET", "/term/stream") => {
-            let id = query_id(&query);
-            stream_session(stream, id)
-        }
+        ("GET", "/term/stream") => term::stream(stream, query_id(&query)),
         // --- the backend office, read-only: rendered dashboard + the parallel ASI OS screen ---
         ("GET", "/dashboard") => match office_file("fable5-dashboard.html") {
             Some(b) => write_resp(&mut stream, 200, "text/html; charset=utf-8", &b),
@@ -212,7 +201,12 @@ fn handle(mut stream: TcpStream) -> std::io::Result<()> {
     }
 }
 
-fn write_resp(stream: &mut TcpStream, code: u16, ctype: &str, body: &[u8]) -> std::io::Result<()> {
+pub(crate) fn write_resp(
+    stream: &mut TcpStream,
+    code: u16,
+    ctype: &str,
+    body: &[u8],
+) -> std::io::Result<()> {
     let status = match code {
         200 => "200 OK",
         400 => "400 Bad Request",
@@ -256,172 +250,6 @@ fn query_id(query: &str) -> u64 {
         }
     }
     0
-}
-
-/// Windows: real Windows shells (+ wsl bash bridge). This same binary also cross-compiles for Linux.
-#[cfg(windows)]
-fn shell_command(shell: &str) -> Command {
-    match shell {
-        "powershell" | "pwsh" => {
-            let mut c = Command::new("powershell.exe");
-            c.args(["-NoLogo", "-NoProfile"]);
-            c
-        }
-        "bash" | "wsl" => {
-            let mut c = Command::new("wsl.exe");
-            c.args(["-d", "Ubuntu", "--", "bash", "-il"]);
-            c
-        }
-        _ => Command::new("cmd.exe"),
-    }
-}
-
-/// Linux (the bare Asolaria-on-metal OS): native shells — NO Windows dependency. Terminals work with
-/// Windows fully closed. `cmd`/`powershell` requests map to a real shell so the same UI drives both.
-#[cfg(unix)]
-fn shell_command(shell: &str) -> Command {
-    let inner = match shell {
-        "zsh" => "zsh",
-        "sh" => "sh",
-        "pwsh" | "powershell" => "pwsh", // if PowerShell-on-Linux is installed
-        _ => "bash",
-    };
-    // Wrap the shell in a real pseudo-terminal via `script` (util-linux) so it is FULLY interactive
-    // over pipes — pure std, no PTY crate. `-f` flushes each write so output streams live.
-    let mut c = Command::new("script");
-    c.args(["-qfec", inner, "/dev/null"]);
-    c
-}
-
-fn spawn_session(shell: &str) -> u64 {
-    let mut cmd = shell_command(shell);
-    cmd.stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-
-    let out = Arc::new(Mutex::new(Vec::<u8>::new()));
-    let id = NEXT_ID.fetch_add(1, Ordering::SeqCst);
-
-    match cmd.spawn() {
-        Ok(mut child) => {
-            let stdin = child.stdin.take();
-            if let Some(mut so) = child.stdout.take() {
-                let o = out.clone();
-                thread::spawn(move || pump(&mut so, o));
-            }
-            if let Some(mut se) = child.stderr.take() {
-                let o = out.clone();
-                thread::spawn(move || pump(&mut se, o));
-            }
-            let sess = Arc::new(Session {
-                stdin: Mutex::new(stdin),
-                out,
-                child: Mutex::new(Some(child)),
-                label: shell.to_string(),
-            });
-            sessions().lock().unwrap().insert(id, sess);
-        }
-        Err(e) => {
-            out.lock().unwrap().extend_from_slice(
-                format!("[asi-os] could not spawn '{shell}': {e}\r\n").as_bytes(),
-            );
-            let sess = Arc::new(Session {
-                stdin: Mutex::new(None),
-                out,
-                child: Mutex::new(None),
-                label: shell.to_string(),
-            });
-            sessions().lock().unwrap().insert(id, sess);
-        }
-    }
-    id
-}
-
-fn pump<R: Read>(r: &mut R, out: Arc<Mutex<Vec<u8>>>) {
-    let mut buf = [0u8; 4096];
-    loop {
-        match r.read(&mut buf) {
-            Ok(0) | Err(_) => break,
-            Ok(n) => out.lock().unwrap().extend_from_slice(&buf[..n]),
-        }
-    }
-}
-
-fn stream_session(mut stream: TcpStream, id: u64) -> std::io::Result<()> {
-    let sess = match sessions().lock().unwrap().get(&id).cloned() {
-        Some(s) => s,
-        None => return write_resp(&mut stream, 404, "text/plain", b"no session"),
-    };
-    let head = "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nConnection: keep-alive\r\n\r\n";
-    stream.write_all(head.as_bytes())?;
-    stream.write_all(format!("event: label\ndata: {}\n\n", sess.label).as_bytes())?;
-    stream.flush()?;
-
-    let mut offset = 0usize;
-    let mut idle_ticks = 0u32;
-    loop {
-        let chunk = {
-            let buf = sess.out.lock().unwrap();
-            if buf.len() > offset {
-                let c = buf[offset..].to_vec();
-                offset += c.len();
-                Some(c)
-            } else {
-                None
-            }
-        };
-        let alive = sessions().lock().unwrap().contains_key(&id);
-        match chunk {
-            Some(c) => {
-                idle_ticks = 0;
-                let ev = format!("data: {}\n\n", base64(&c));
-                if stream.write_all(ev.as_bytes()).is_err() || stream.flush().is_err() {
-                    break;
-                }
-            }
-            None => {
-                if !alive {
-                    let _ = stream.write_all(b"event: end\ndata: end\n\n");
-                    let _ = stream.flush();
-                    break;
-                }
-                idle_ticks += 1;
-                if idle_ticks % 100 == 0 {
-                    // keepalive comment so proxies/browsers don't drop the stream
-                    if stream.write_all(b": keepalive\n\n").is_err() {
-                        break;
-                    }
-                    let _ = stream.flush();
-                }
-                thread::sleep(Duration::from_millis(80));
-            }
-        }
-    }
-    Ok(())
-}
-
-/// Minimal std base64 encoder (no external crate) — terminal bytes survive SSE faithfully.
-fn base64(data: &[u8]) -> String {
-    const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = String::with_capacity(data.len().div_ceil(3) * 4);
-    for chunk in data.chunks(3) {
-        let b0 = chunk[0];
-        let b1 = *chunk.get(1).unwrap_or(&0);
-        let b2 = *chunk.get(2).unwrap_or(&0);
-        out.push(T[(b0 >> 2) as usize] as char);
-        out.push(T[(((b0 & 0x03) << 4) | (b1 >> 4)) as usize] as char);
-        out.push(if chunk.len() > 1 {
-            T[(((b1 & 0x0f) << 2) | (b2 >> 6)) as usize] as char
-        } else {
-            '='
-        });
-        out.push(if chunk.len() > 2 {
-            T[(b2 & 0x3f) as usize] as char
-        } else {
-            '='
-        });
-    }
-    out
 }
 
 /// Read the LIVE local fabric surfaces and return a compact HBP-ish status block the UI renders.
