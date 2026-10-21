@@ -1,0 +1,4 @@
+MAPPEDBACKUP|utc=20261021T221734284Z|native_pid=10208|host8_pid=5824|room_writes=0|USB_writes=0|reboot=0|json=0
+LAUNCHERBACKUP|source=C:\asolaria-acer\asolaria-asi-os\Start-AsolariaASIOS.ps1|backup=C:\Users\acer\asolaria-unification-20261020\mapped-activation-20261021T221734284Z\1.ps1|sha256=a447f2aa45bde568e192a7beecff238c8ab7db4855b07c5b522a2d149fe3a9f2|json=0
+LAUNCHERBACKUP|source=C:\asolaria-behcs-256\state\host8-serve-watchdog.ps1|backup=C:\Users\acer\asolaria-unification-20261020\mapped-activation-20261021T221734284Z\2.ps1|sha256=8c04dcdac608b27283790ef87eb516b93961ab3e2327017e100dd38fcffb3d77|json=0
+LAUNCHERBACKUP|source=C:\asolaria-acer\start-asolaria-engines.ps1|backup=C:\Users\acer\asolaria-unification-20261020\mapped-activation-20261021T221734284Z\3.ps1|sha256=bb31b36282ca88d7225cb9f83c099eaadd5c004dcd2bcac0fd5edfa603403e0d|json=0

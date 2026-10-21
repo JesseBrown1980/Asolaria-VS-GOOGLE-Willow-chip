@@ -1,0 +1,11 @@
+[package]
+name = "host8-native-mapping"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.81"
+license = "MIT OR Apache-2.0"
+description = "Isolated Windows read-only file mapping for the existing Host8 identity plane"
+
+[workspace]
+
+[dependencies]

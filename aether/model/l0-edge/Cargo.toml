@@ -1,0 +1,22 @@
+[package]
+name = "asolaria-l0-edge"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.81"
+license = "MIT OR Apache-2.0"
+description = "Integer port of the Asolaria L0 EdgeLevelGNN: graph-event features, the trained checkpoint's weights and the forward inference_server.py runs"
+repository = "https://github.com/JesseBrown1980/With-Felipe-Miguel-Olimpio-da-Cruz-as-The-omega-and-Aether..."
+keywords = ["gnn", "graph", "integer", "fixed-point"]
+categories = ["algorithms"]
+
+[lib]
+name = "l0_edge"
+path = "src/lib.rs"
+
+[dependencies]
+
+[features]
+default = ["std"]
+std = []
+
+[workspace]

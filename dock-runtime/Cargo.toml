@@ -1,0 +1,17 @@
+[package]
+name = "asolaria-native-dock"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.81"
+license = "MIT OR Apache-2.0"
+description = "Bounded loopback HBP station federation over explicit USB tunnels"
+
+[workspace]
+
+[dependencies]
+asolaria-unified-core = { path = "../shared-runtime", features = ["std"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+panic = "abort"

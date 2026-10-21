@@ -1,0 +1,8 @@
+DOCKLIVEHDR|schema=ASOLARIA-NATIVE-DOCK-LIVE-V1|date=2026-10-21|stations=ACER,FALCON|transport=ADB_USB_loopback_forward_15091_reverse_15090|json=0
+DOCKBINARY|station=ACER|target=x86_64-pc-windows-gnu|toolchain=1.81.0|path=C:\asolaria-acer\asolaria-asi-os\target\release\asolaria-native-dock-20261021.exe|bytes=708012|sha256=3552546ef39dd70be5a621fa4b1ab0a954a07c62c20624d9ee1f7e33501b8b8a|pid=5348|bind=127.0.0.1:5090|peer=127.0.0.1:15091|json=0
+DOCKBINARY|station=FALCON|target=aarch64-unknown-linux-musl|toolchain=1.81.0|path=/data/local/tmp/asolaria-native-dock-20261021|bytes=842752|sha256=63ff95c0a672e487f429daa064c5b220844ba3220f5e228a664a7e5a4adc076e|pid=10749|bind=127.0.0.1:5091|peer=127.0.0.1:15090|json=0
+DOCKVERIFIED|route=/health.hbp|acer_status=200|falcon_status=200|state=MEASURED_PASS|json=0
+DOCKVERIFIED|route=/dock.hbp|acer_to_falcon=200|falcon_to_acer=200|falcon_ram_total_bytes=7575273472|acer_room_source=CONFIGURED|state=MEASURED_PASS|json=0
+DOCKVERIFIED|route=/peer/room.hbp|direction=FALCON_to_ACER|rooms_tested=0,6250000000|decode=EXACT|omega_trits=000000000000000000000000000|state=MEASURED_PASS|json=0
+DOCKVERIFIED|route=/peer/task.hbp|direction=ACER_to_FALCON|tasks=prism_27_lanes,gnn_12_Q24,sha_616263|prism_roundtrip=EXACT|gnn_forwards=2|float_used=0|state=MEASURED_PASS|json=0
+DOCKLIVEFTR|room_writes=0|phone_room_overwrites=0|runtime_provider_calls=0|runtime_gpu_calls=0|node_v8=0|json=0

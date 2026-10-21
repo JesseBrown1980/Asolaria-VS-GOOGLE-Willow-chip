@@ -62,6 +62,15 @@ sh scripts/install-full-node.sh      # Windows:  powershell -ExecutionPolicy Byp
 
 The engines are already public: **[asolaria-federation-1024](https://github.com/JesseBrown1980/asolaria-federation-1024)** (recall-serve, host8-serve, kernel, agent-runtime, stubbed rooms — 17 crates) · **[Hilbra](https://github.com/JesseBrown1980/Hilbra)** (the Asolaria-internet protocol) · **[asolaria-behcs-256](https://github.com/JesseBrown1980/asolaria-behcs-256)** (the glyph substrate). The full-node installer clones + builds them for you; your corpus starts empty and is never published.
 
+## Unification Crates (12.5B Room Memory + Native PC/Phone Station Dock)
+
+This repository also includes the portable Rust 1.81 (`float_used=0`, `json=0` hot path, balanced-ternary `{-, 0, +}`) crates that unify the post-Windows ASI OS, Host8-on-metal, pre-Windows standalone UEFI boot path, and USB-docked station federation:
+
+- **`host8-native-mapping/`** — Zero-dependency Win32 FFI (`CreateFileMappingW` / `MapViewOfFile`) read-only identity-plane mapping for the 100 GB / `12,500,000,000` 8-byte Host8 room store (`125` sector files × `800,000,000` bytes).
+- **`shared-runtime/` (`asolaria-unified-core`)** — `#![no_std]` + optional `std` unified HBP command core (`status`, `memory`, `omega`, `roomaddr`, `room`, `sha`, 27-lane NTT `prism`, and 2-forward Q24 integer `gnn` over `aether/model/l0-edge` + `aether/model/l4-gslgnn`), reusing the canonical `tribit` module (`canonical/asolaria-os/kernel/core/src/tribit/mod.rs`) and NTFS extent map (`HOST8-PLACEMENT.hbp`).
+- **`dock-runtime/` (`asolaria-native-dock`)** — Loopback-only HBP station federation over explicit ADB USB forward/reverse tunnels (`ACER` PC station on `127.0.0.1:5090` ↔ `FALCON` ARM64 phone station on `127.0.0.1:5091`), preserving each station's local identity and address space while providing authenticated read-only room RPC (`/peer/room.hbp?n=...`) and pure shared-core compute RPC (`/peer/task.hbp?cmd=...`).
+- **`receipts/`** — Sealed HBP + `.hbi` + `.sha256` verification receipts (`MAPPED-ACTIVATION-20261021-RESULT.hbp`, `PHONE-DOCK-AUDIT-20261021.hbp`, `DOCK-LIVE-20261021.hbp`, `GITHUB-3D-VIEW.hbp`), alongside [ROOM-MEMORY-INTEGRATION.md](ROOM-MEMORY-INTEGRATION.md) and [WINDOWS-MEMORY-ASSESSMENT.md](WINDOWS-MEMORY-ASSESSMENT.md).
+
 ## Autostart (optional)
 
 `deploy/` ships a **systemd** unit, a **.desktop** autostart entry, and a full-screen launcher (`deploy/start-asolaria-asi-os.sh`) for a bare Asolaria-on-metal Linux install. Point the paths at your install and enable them to have the OS come up full-screen at boot.

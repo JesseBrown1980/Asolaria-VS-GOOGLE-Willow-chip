@@ -1,0 +1,23 @@
+[package]
+name = "asolaria-l4-gslgnn"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.81"
+license = "MIT OR Apache-2.0"
+description = "Integer port of the Asolaria L4 GSLGNN as served on port 4793, with its served v2 checkpoint's weights and the asolaria-score request"
+repository = "https://github.com/JesseBrown1980/With-Felipe-Miguel-Olimpio-da-Cruz-as-The-omega-and-Aether..."
+keywords = ["gnn", "graph", "integer", "fixed-point"]
+categories = ["algorithms"]
+
+[lib]
+name = "l4_gslgnn"
+path = "src/lib.rs"
+
+[dependencies]
+sha2 = { version = "0.10.9", default-features = false }
+
+[features]
+default = ["std"]
+std = []
+
+[workspace]

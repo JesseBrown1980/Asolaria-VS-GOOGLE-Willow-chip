@@ -1,0 +1,4 @@
+# Aether/Host8 and its crypto dependencies are tested on this toolchain.
+[toolchain]
+channel = "1.81.0"
+components = ["clippy", "rustfmt"]

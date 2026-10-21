@@ -1,0 +1,4 @@
+783b9b50d92ed8756270b87f5922d66a19972bfd51c1bc0d5ca0d5a483d22475  vendor/gnn-sidecar/models/gsl_gnn.py
+51b739fbc5851e391b90a917ee92062a97003f9428ec2167c49c7a76ff86bbc5  vendor/gnn-sidecar/models/__init__.py
+8ac31eff0320a3bc0eb9a3c95ed8c271d93c5fbce907230ed2e76a390a01fc88  vendor/fnns/src/gslgnn_inference_server.py
+9e50723b10c9de5c27baa5bc9386340bf72f76bcae2877064a47e4627a86602c  vendor/fnns/models/gslgnn_w9_3_seq47_v2.pt

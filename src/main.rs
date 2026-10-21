@@ -284,6 +284,16 @@ fn handle(mut stream: TcpStream) -> std::io::Result<()> {
             });
             write_resp(&mut stream, 200, "text/plain; charset=utf-8", body.as_bytes())
         }
+        ("GET", "/api/dock") => {
+            let acer = http_get("127.0.0.1", 5090, "/health.hbp", 500).unwrap_or_else(|| {
+                "DOCKHEALTH|station=ACER|port=5090|up=0|json=0\n".into()
+            });
+            let falcon = http_get("127.0.0.1", 15091, "/health.hbp", 500).unwrap_or_else(|| {
+                "DOCKHEALTH|station=FALCON|port=15091|up=0|json=0\n".into()
+            });
+            let body = format!("{acer}{falcon}");
+            write_resp(&mut stream, 200, "text/plain; charset=utf-8", body.as_bytes())
+        }
         ("GET", "/fs/list") | ("GET", "/fs/read") => {
             let (code, ctype, body) = office_browse(&path, &query);
             write_resp(&mut stream, code, ctype, &body)
@@ -385,6 +395,8 @@ fn live_status() -> String {
         }
     }
     let fabric_up = http_get("127.0.0.1", 4949, "/health", 400).is_some();
+    let dock_acer_up = http_get("127.0.0.1", 5090, "/health.hbp", 300).is_some();
+    let dock_falcon_up = http_get("127.0.0.1", 15091, "/health.hbp", 300).is_some();
 
     format!(
         "ASIOSLIVE|ts_unix={}|seat={}\n\
@@ -392,6 +404,7 @@ fn live_status() -> String {
          RECALL|port=4796|up={}|listen={}|role=local-inverted-index-vault\n\
          BUS|port=4947|up={}|listen={}|inbox_depth={}\n\
          FABRIC|port=4949|up={}|listen={}|role=super-dashboard\n\
+         DOCK|acer_port=5090|acer_up={}|falcon_port=15091|falcon_up={}|role=native-station-dock|json=0\n\
          SOVLINUX|bind=label+volume_serial|label=SOVLINUX|volume_serial={}|role=local-sovereignty-vault|present=NOT_PROBED\n",
         now_unix(),
         seat_name(),
@@ -406,6 +419,8 @@ fn live_status() -> String {
         inbox,
         b(fabric_up),
         b(fabric_up || listening(4949)),
+        b(dock_acer_up),
+        b(dock_falcon_up),
         read_ident("ASOLARIA_SOVLINUX_SERIAL", "sovlinux.serial", "UNSET"),
     )
 }

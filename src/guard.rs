@@ -126,6 +126,7 @@ pub fn sensitive(path: &str) -> bool {
         || path.starts_with("/asios/")
         || path == "/api/recall"
         || path == "/api/kernel"
+        || path == "/api/dock"
         || path == "/dashboard"
 }
 

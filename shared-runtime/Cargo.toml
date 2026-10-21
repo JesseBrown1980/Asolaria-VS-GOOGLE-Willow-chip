@@ -1,0 +1,30 @@
+[package]
+name = "asolaria-unified-core"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.81"
+license = "MIT OR Apache-2.0"
+description = "One integer HBP command core for the pre-Windows kernel, native ASI OS and bridge"
+
+[workspace]
+
+[features]
+default = []
+std = ["dep:host8-native-mapping"]
+
+[dependencies]
+asolaria-l0-edge = { path = "../aether/model/l0-edge", default-features = false }
+asolaria-l4-gslgnn = { path = "../aether/model/l4-gslgnn", default-features = false }
+sha2 = { version = "0.10.9", default-features = false }
+
+[target.'cfg(windows)'.dependencies]
+host8-native-mapping = { path = "../host8-native-mapping", optional = true }
+
+[[example]]
+name = "mapped_identity_probe"
+required-features = ["std"]
+
+[profile.release]
+opt-level = 3
+lto = true
+panic = "abort"
