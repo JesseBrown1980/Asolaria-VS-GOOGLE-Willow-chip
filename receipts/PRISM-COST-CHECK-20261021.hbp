@@ -1,0 +1,1 @@
+PRISMCOSTCHECK|prime=1000081|generator=7|lanes=27|root=951846|vectors=127|fwd_inner_muls=1458|fwd_adds=729|inv_inner_muls=1485|inv_adds=729|parseval=EXACT|roundtrip=EXACT|motor_block_strokes=6|host8_rooms=12500000000|shards=125|float_used=0|json=0

@@ -1,0 +1,159 @@
+rec|KEY-3174|json=0|owner=Jesse Daniel Brown|date=2026-07-27
+ord|"we just needed to save the 3.1 kb.key and IT with bobby and the mtp agents will play it"
+ans|found it. it is prior3174.bin. 3,174 bytes = 3.099 KiB = the 3.1 kb key.
+ans|nothing else in the container is a 3.1 KB object that gets PLAYED.
+
+key|path|/root/compressor-run/rust-cm3t/prior3174.bin
+key|bytes|3174
+key|sha256|1be91cb748b2b364c1f9f4dca1e7a89bcd8840e5e179e494dc611452be6556fd
+key|origin|enwik8[90,000,000 .. 90,003,174)  VERIFIED this run by mmap.find -> offset 90000000
+key|why3174|"deliberately the size of the hyperbech HEAD payload" (run_prior_test.sh)
+key|howplayed|RB_PRIOR=<file>. cm3ti_gt256.rs:461 reads it and runs warm() SYMMETRICALLY
+key|howplayed|on BOTH compress and decompress before coding. lossless. never in the stream.
+key|howplayed|so it is a KEY in the literal sense: both sides must hold the same 3,174 bytes.
+
+play|THE PLAYERS JESSE NAMED — both are real and both are in the tree
+pl|bobby|the rime BOBBY FISCHER. Law 23. Pohlig-Hellman discrete log on the sphere.
+pl|bobby|ADDRESSES any single element in O(1), one modular exponentiation, without
+pl|bobby|materializing the object. src: trijection/rime_fischer.py, rime_fischer_cluster.py
+pl|bobby|(one Fischer per prime tower, CRT fan-in), rime_27fischers.py (27 spheres/MCPs
+pl|bobby|circling the free 0). measured: level-3 third, level-27 trime digits {-,0,+},
+pl|bobby|level-rime full k, byte-exact invert = True.
+pl|mtp|the MTP AGENTS. Law 24. frozen multi-token prediction x1 / x3 / x27,
+pl|mtp|direction - (backward) / 0 (hold) / + (forward). src: trijection/rime_agents.py.
+pl|mtp|measured on held-out enwik8, frozen order-2: 0 = 1.0000 (the free center, costs
+pl|mtp|nothing and says nothing); + x1 = 0.3517, x3 = 0.0667, x27 = 0.0000;
+pl|mtp|- x1 = 0.3317 (real, near-symmetric on reversed time).
+pl|mtp|GATE: lookahead decays to zero by depth 27. the frozen slice predicts a
+pl|mtp|fraction. it never recreates an unseen whole.
+pl|hrm|Law 25 two-rate hierarchy also present: 99% routed deep, frozen bpc 3.5328.
+pl|mcp|Law 26 stateless cells x CRT fan-in: M = 4,814,857, batch byte-exact = True.
+
+prin|THE PRINCIPLE THE KEY BELONGS TO — rime_run.py, verbatim intent
+pr|1|TRAIN/CALCULATE the functions once (the sphere p, g, k).
+pr|2|FREEZE/SLICE/SAVE: keep only the functions + the fraction-of-a-rime addresses.
+pr|3|PLAY afterward on CPU with the rime Bobby Fischer: address any element on
+pr|3|demand in O(1), WITHOUT building the object.
+pr|obs|the observer stays OUTSIDE at the null 0. the frozen system never changes.
+pr|so|this is why the corpus is not the deliverable and the key is. saving the corpus
+pr|so|is materializing. saving the key is freezing. rime_run.py already said so.
+
+meas|WHAT THE KEY ACTUALLY MEASURES — all rows same corpus, same binary, same mode
+meas|corpus slice10M.txt = enwik8[20,000,000..30,000,000)  sha16 adea6c0b9428129b
+meas|binary cm3ti_gt256   mode g:256:64:8   k=10   N=10,000,000   decoder_src=26,377
+meas|every row restore=OK. source: prior-test.log, prior-sweep.log, both re-read this run.
+hdr|arm|prior_B|payload|saving_vs_base|charged_total|bpc_honest|verdict
+mr|baseline|0|2285979|0|2312356|1.8499|reference
+mr|KEY prior3174 DISTANT|3174|2285400|579|2314951|1.8520|LOSES by 2595 B
+mr|prior31740 DISTANT|31740|2283602|2377|2341719|1.8734|LOSES by 29363 B
+mr|prior317400 DISTANT|317400|2275161|10818|2618938|2.0952|LOSES by 306582 B
+mr|prior3174000 DISTANT|3174000|2248610|37369|5448987|4.3592|LOSES by 3136631 B
+mr|priorPREV317400 ADJACENT|0 charged|2272589|13390|2298966|1.8392|WINS free
+mr|priorPREV3174000 ADJACENT|0 charged|2244493|41486|2270870|1.8167|WINS free
+mr|priorC317400 NOISE|317400|2299064|-13085|2642818|2.1143|HURTS before charging
+
+law|NEW LAW — THE SHIPPED PRIOR CAN NEVER PAY FOR ITSELF
+lw|010|return rate falls with size: 579/3174 = 18.24%, 2377/31740 = 7.49%,
+lw|010|10818/317400 = 3.41%, 37369/3174000 = 1.18%. four points, monotone.
+lw|011|fit: saving ~ S^0.603 (log-log slope over three decades = 0.603).
+lw|011|break-even needs saving >= S, which holds only below S ~ 44 bytes.
+lw|011|therefore no shipped distant prior of any useful size pays for itself IN ONE
+lw|011|MONOLITHIC STREAM. amended 2026-07-27 (ERRATA-1): under SECTIONING it DOES
+lw|011|pay - saving is a fixed transient per cold model start, recurs per section,
+lw|011|charge paid once, break-even 5.31 sections, 36/36 byte-exact.
+lw|011c|SUPERSEDED-IN-SCOPE|measured=2026-07-27|by=ACER-CLAUDE-FABLE5|receipt=FABLE5-KEY-PAYS-SECTIONED.hbp|json=0
+lw|011c|scope_of_original=prior_size_swept_at_ONE_fixed_target|holds_for=single_monolithic_stream|json=0
+lw|011c|FALSE_under=sectioning|mechanism=saving_is_fixed_transient_per_cold_model_start|recurs_per_section|charge_paid_once|json=0
+lw|011c|target_sweep_N=50000,100000,200000,400000,800000|saving=626,649,699,726,727|saturates=1|exponent=0.059|json=0
+lw|011c|sectioned=12x100000|base_payload=524051|base_bpc=3.4937|json=0
+lw|011c|sectioned|arm=KEY|payload=516880|charge=3174|total=520054|bpc=3.4670|net=-3997|verdict=WINS|json=0
+lw|011c|sectioned|arm=MYTHOS|payload=517547|charge=3174|total=520721|bpc=3.4715|net=-3330|verdict=WINS|json=0
+lw|011c|per_section_saving=598,542|breakeven_sections=5.31,5.86|roundtrips_byte_exact=36|failures=0|json=0
+lw|011c|enwik9_extrap|section=100000|sections=10000|key_net=+5972659|mythos_net=+5416826|json=0
+lw|011c|caveat|random_prior_still_HURTS_before_charging=-102B|good_prior_only|json=0
+lw|012|the 3.1 KB key has the BEST return rate of the whole ladder (18.24%) and
+lw|012|still loses, because it is charged. its value is not in being shipped.
+
+law|LOCALITY IS THE MECHANISM, AND IT IS FREE
+lw|013|at matched width the adjacent prior beats the distant one every time:
+lw|013|at 317,400 by 2,572 B. at 3,174,000 by 4,117 B. same size, same binary.
+lw|014|in a sectioned/streaming decode the decoder has ALREADY rebuilt the
+lw|014|preceding bytes. the adjacent prior ships NOTHING. cost zero.
+lw|014|so its whole saving is net. 1.8167 is real under sectioning and only there.
+lw|015|VERIFIED BY ME THIS RUN, not taken on trust:
+lw|015|priorPREV317400  = enwik8[19,682,600 .. 20,000,000)  ends exactly at 20,000,000
+lw|015|priorPREV3174000 = enwik8[16,826,000 .. 20,000,000)  ends exactly at 20,000,000
+lw|015|slice10M.txt begins at enwik8 offset 20,000,000. contiguous. byte-exact. true.
+
+jesse|THE SCORE ON JESSE'S OWN SENTENCE, BOTH HALVES
+je|said|"It's mathematical. It doesn't matter what picture you feed it. As long as
+je|said|you divide it up into pieces, it's gonna eat it."
+je|half1|"doesn't matter what picture" — REFUTED. priorC317400 (xz noise, same 317,400 B)
+je|half1|made the payload 13,085 B WORSE than feeding nothing at all. content matters.
+je|half2|"as long as you divide it up into pieces" — CONFIRMED. that is the adjacent arm.
+je|half2|it is the ONLY arm in the whole sweep that goes net-positive, and it does so
+je|half2|because sectioning makes the prior free. the architecture is his and it won.
+je|note|he was also right to reject the first refutation. one point is not a curve.
+je|note|the curve, measured, says the mechanism is real and the ACCOUNTING is what kills
+je|note|the shipped version. that distinction only appeared because he pushed back.
+
+err|DOCUMENTATION ERROR FOUND AND CORRECTED THIS RUN
+er|1|run_prior_sweep.sh says prior317400.bin is "enwik8[90,000,000 ..]". it is not.
+er|1|prior31740, prior317400 and prior3174000 ALL begin at enwik8 offset 94,371,840.
+er|1|that is 90 MiB (90 x 2^20), not 90,000,000 decimal.
+er|2|prior3174.bin alone is at 90,000,000 decimal. so the KEY is NOT a prefix of the
+er|2|larger priors and the four sizes are NOT a nested series. verified by sha:
+er|2|head -c 3174 of all three larger priors = fc2aa2a2f0cfd250; the key = 1be91cb7.
+er|3|consequence: the size axis mixes a size change with a content change at the
+er|3|first point. the trend survives (three nested points still fall monotonically)
+er|3|but the 3174 row is off-curve by provenance and must be labelled that way.
+
+played|THE KEY, PLAYED BY THE MTP AGENT — run 2026-07-27, players/play_the_key.py
+pd|setup|MTP Law 24, frozen order-2 top-1 table, train once, never retrain.
+pd|setup|held-out = enwik8[20,000,000..20,600,000) sha16 8e35ab13a8ce933d
+pd|setup|(the head of slice10M.txt — same corpus the prior sweep measured)
+pd|setup|4,000 anchors. two denominators reported: raw (uncovered context = miss)
+pd|setup|and covered (only contexts the frozen table actually holds).
+hdr|arm|train_B|contexts|coverage|+x1 raw|+x1 cov|+x3|+x27|-x1
+pl|KEY|3174|508|0.7967|0.2070|0.2598|0.0288|0.0000|0.2092
+pl|ADJACENT|3174|557|0.8195|0.2245|0.2739|0.0338|0.0000|0.2235
+pl|RANDOM|3174|3104|0.0605|0.0000|0.0000|0.0000|0.0000|0.0000
+pl|BIG|500000|4062|0.9932|0.3523|0.3546|0.0735|0.0000|0.3645
+pd|check|BIG's 0.3523 reproduces rime_agents.txt's 0.3517 on a different held-out
+pd|check|region. the four frozen agents were also re-run whole this seat and every
+pd|check|number matched: 0.3517 / 0.0667 / 0.0000 / 0.3317, HRM bpc 3.5328,
+pd|check|MCP M=4,814,857 byte-exact. logged baselines reproduced, not trusted.
+
+hl|THE HEADLINE — WHAT THE 3.1 KB KEY ACTUALLY CARRIES
+hl|1|3,174 bytes reach 0.2070 forward x1 accuracy. 500,000 bytes reach 0.3523.
+hl|1|the key is 0.63% of the bytes and delivers 58.8% of the predictive power.
+hl|2|it covers 79.67% of held-out contexts from 3,174 bytes. coverage is the
+hl|2|cheap part of language. accuracy inside coverage is the expensive part.
+hl|3|locality shows up here too, independently of the compressor: the ADJACENT
+hl|3|3,174 bytes beat the KEY 0.2245 to 0.2070. same size, same everything else.
+hl|3|that is the third independent sighting of the locality premium.
+hl|4|RANDOM scores 0.0000 on every column. this is WHY priorC317400 made the
+hl|4|payload 13,085 B worse. noise is not a weak prior, it is a harmful one.
+
+det|A CHEAP SCREEN THAT FELL OUT OF THIS — contexts per byte
+dt|1|distinct frozen contexts / training bytes:
+dt|1|KEY 508/3174 = 0.160   ADJACENT 557/3174 = 0.176
+dt|1|RANDOM 3104/3174 = 0.978   BIG 4062/500000 = 0.008
+dt|2|the RANDOM arm produces ALMOST ONE CONTEXT PER BYTE — nothing repeats.
+dt|2|English collapses into few, frequent contexts. so context-count is
+dt|2|ANTI-correlated with usefulness.
+dt|3|therefore: a candidate prior can be screened in O(n), on the prior alone,
+dt|3|with no corpus and no compressor run. high contexts-per-byte = it will hurt.
+dt|3|this is a new test and it costs milliseconds. it should gate every prior
+dt|3|before any 2-minute compressor arm is spent on it.
+
+open|WHAT IS STILL NOT SETTLED
+op|1|the adjacent arm is only honest if the decoder truly decodes in order and
+op|1|holds the preceding section. that is an architecture commitment, not a flag.
+op|1|it must be written into the decoder and demonstrated end to end before 1.8167
+op|1|is quoted anywhere as a result.
+op|2|these rows are on slice10M.txt. the axis-geometry table is on /tmp/e10m
+op|2|(sha16 5985c81c39d927ae). DIFFERENT CORPUS. the two tables must never be
+op|2|compared row to row. corpus-identity law.
+
+end|KEY-3174
