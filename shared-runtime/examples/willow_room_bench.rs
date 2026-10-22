@@ -731,6 +731,103 @@ fn run_stage5_federated_usb_dock() -> String {
     }
 }
 
+fn run_stage3_synthetic_125_sectors(threads: usize) -> Vec<String> {
+    let _ = FILE_BYTES;
+    let _ = Path::new("");
+    let omega_stub = mix((HALF27_I64 as u64) ^ SEED);
+    let _ = address(OMEGA_ROOM);
+    let mut rows = Vec::new();
+    let rooms_per_sector_sweep: u64 = 80_000;
+    let circuits_per_sector: u64 = 16;
+    let t_sweep = Instant::now();
+    let mut total_rooms_checked = 0_u64;
+    let mut total_bad = 0_u64;
+    let mut total_room_xor = 0_u64;
+    let mut total_circuits = 0_u64;
+    let mut total_parseval = 0_u64;
+    let mut total_roundtrip = 0_u64;
+    let mut total_xeb_xor = 0_u64;
+
+    thread::scope(|s| {
+        let mut handles = Vec::with_capacity(threads);
+        for t in 0..threads {
+            handles.push(s.spawn(move || {
+                let mut rooms_checked = 0_u64;
+                let mut bad = 0_u64;
+                let mut room_xor = 0_u64;
+                let mut circuits = 0_u64;
+                let mut parseval_ok = 0_u64;
+                let mut roundtrip_ok = 0_u64;
+                let mut xeb_xor = 0_u64;
+
+                for shard in (t as u64..SECTORS).step_by(threads) {
+                    let shard_base_room = shard * ROOMS_PER_FILE;
+                    let start_room_in_shard = (ROOMS_PER_FILE / 2) - (rooms_per_sector_sweep / 2);
+                    for i in 0..rooms_per_sector_sweep {
+                        let global_room = shard_base_room + start_room_in_shard + i;
+                        let expected_word =
+                            (global_room as i64 - (ROOM_COUNT / 2) as i64 + HALF27_I64) as u64;
+                        let stub = mix(expected_word ^ SEED);
+                        let word = unmix(stub) ^ SEED;
+                        if word != expected_word {
+                            bad += 1;
+                        }
+                        room_xor ^= stub;
+                        rooms_checked += 1;
+                    }
+                    for c in 0..circuits_per_sector {
+                        let group_idx_in_shard = ((c * 46_291) + (shard * 729))
+                            % ((ROOMS_PER_FILE / ROOMS_PER_GROUP) - 4);
+                        let base_rn = shard_base_room + group_idx_in_shard * ROOMS_PER_GROUP;
+                        let mut blocks = [[0_u64; PRISM_LANES]; PRISM_BLOCKS_FOR_105];
+                        for (b, blk) in blocks.iter_mut().enumerate() {
+                            for (lane, slot) in blk.iter_mut().enumerate() {
+                                let rn = base_rn + (b * PRISM_LANES + lane) as u64;
+                                let word =
+                                    (rn as i64 - (ROOM_COUNT / 2) as i64 + HALF27_I64) as u64;
+                                let stub = mix(word ^ SEED);
+                                *slot = (stub ^ word ^ omega_stub) % PRISM_P;
+                            }
+                        }
+                        let (xeb, pok, rok) =
+                            run_willow_108lane_circuit(blocks, WILLOW_DEPTH, omega_stub);
+                        circuits += 1;
+                        parseval_ok += pok;
+                        roundtrip_ok += rok;
+                        xeb_xor ^= xeb.rotate_left((c & 31) as u32);
+                    }
+                }
+                (
+                    rooms_checked,
+                    bad,
+                    room_xor,
+                    circuits,
+                    parseval_ok,
+                    roundtrip_ok,
+                    xeb_xor,
+                )
+            }));
+        }
+        for h in handles {
+            let (rc, b, rx, cir, pok, rok, xx) = h.join().expect("synth worker");
+            total_rooms_checked += rc;
+            total_bad += b;
+            total_room_xor ^= rx;
+            total_circuits += cir;
+            total_parseval += pok;
+            total_roundtrip += rok;
+            total_xeb_xor ^= xx;
+        }
+    });
+    let elapsed_ns = (t_sweep.elapsed().as_nanos() as u64).max(1);
+    let rooms_per_s =
+        (total_rooms_checked as u128 * 1_000_000_000_u128 / elapsed_ns as u128) as u64;
+    rows.push(format!(
+        "WILLOW_STAGE3_ALL_125_SECTORS_SYNTHETIC|sectors_evaluated={SECTORS}|total_rooms_in_store={ROOM_COUNT}|total_groups_in_store={GROUP_COUNT}|omega_room={OMEGA_ROOM}|omega_stub={omega_stub:016x}|rooms_verified={total_rooms_checked}|decode_bad={total_bad}|willow_d40_circuits_on_rooms={total_circuits}|parseval_exact={total_parseval}|roundtrip_exact={total_roundtrip}|threads={threads}|ns_total={elapsed_ns}|rooms_per_s={rooms_per_s}|room_xor={total_room_xor:016x}|xeb_xor={total_xeb_xor:016x}|writes=0|float_used=0|json=0"
+    ));
+    rows
+}
+
 fn main() {
     let threads = thread::available_parallelism()
         .map(|n| n.get())
@@ -755,14 +852,29 @@ fn main() {
     }
 
     #[cfg(windows)]
-    match run_stage3_all_125_mapped_sectors(&root, threads) {
-        Ok(stage3) => {
-            for r in &stage3 {
-                println!("{r}");
+    if root.join("sector-000.rooms").exists() {
+        match run_stage3_all_125_mapped_sectors(&root, threads) {
+            Ok(stage3) => {
+                for r in &stage3 {
+                    println!("{r}");
+                }
+            }
+            Err(e) => {
+                println!(
+                    "WILLOW_STAGE3_ALL_125_SECTORS_MAPPED|error={e}|writes=0|float_used=0|json=0"
+                );
             }
         }
-        Err(e) => {
-            println!("WILLOW_STAGE3_ALL_125_SECTORS_MAPPED|error={e}|writes=0|float_used=0|json=0");
+    } else {
+        for r in run_stage3_synthetic_125_sectors(threads) {
+            println!("{r}");
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = &root;
+        for r in run_stage3_synthetic_125_sectors(threads) {
+            println!("{r}");
         }
     }
 
