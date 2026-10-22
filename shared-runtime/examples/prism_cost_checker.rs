@@ -1,6 +1,6 @@
 //! Integer-only correctness-and-cost checker for the 27-point NTT Rime Prism
 //! (`tribit::prism` / `tribit::unprism`), the 3-adic Motor Block crank lift,
-//! and the 12.5B Host-8 room bijection. Rust 1.81, zero float (`float_used=0`).
+//! and the 12.5B Host-8 room bijection + 27-Room/1-Omega group prism. Rust 1.81, zero float (`float_used=0`).
 #![forbid(unsafe_code)]
 #![deny(clippy::float_arithmetic)]
 
@@ -8,12 +8,23 @@
 #[path = "../../canonical/asolaria-os/kernel/core/src/tribit/mod.rs"]
 mod tribit;
 
-use asolaria_unified_core::{address, mix, unmix, HALF27, ROOMS_PER_FILE, ROOM_COUNT, SEED};
+use asolaria_unified_core::{
+    address, group_row, mix, unmix, RoomRead, HALF27, ROOMS_PER_FILE, ROOM_BYTES, ROOM_COUNT, SEED,
+};
 
 const K: usize = tribit::K;
 const P: u64 = tribit::P;
 const G: u64 = tribit::G;
 const W: u64 = tribit::W;
+
+struct SyntheticStore;
+impl RoomRead for SyntheticStore {
+    fn read8(&mut self, shard: u64, offset: u64) -> Result<[u8; 8], &'static str> {
+        let n = shard * ROOMS_PER_FILE + offset / ROOM_BYTES;
+        let a = address(n)?;
+        Ok(mix(a.word ^ SEED).to_le_bytes())
+    }
+}
 
 #[inline]
 const fn mod_mul(a: u64, b: u64) -> u64 {
@@ -191,8 +202,33 @@ fn main() {
     assert_eq!(ground.balanced, 0);
     assert_eq!(ground.word, HALF27 as u64);
 
+    #[cfg(feature = "std")]
+    let group_rows = match asolaria_unified_core::native::with_rooms(|r| {
+        Ok(format!("{}{}", group_row(r, "0")?, group_row(r, "omega")?))
+    }) {
+        Ok(rows) => rows,
+        Err(_) => {
+            let mut s = SyntheticStore;
+            format!(
+                "{}{}",
+                group_row(&mut s, "0").expect("synthetic group 0"),
+                group_row(&mut s, "omega").expect("synthetic group omega")
+            )
+        }
+    };
+    #[cfg(not(feature = "std"))]
+    let group_rows = {
+        let mut s = SyntheticStore;
+        format!(
+            "{}{}",
+            group_row(&mut s, "0").expect("synthetic group 0"),
+            group_row(&mut s, "omega").expect("synthetic group omega")
+        )
+    };
+
     println!(
         "PRISMCOSTCHECK|prime={P}|generator={G}|lanes={K}|root={W}|vectors={vectors_checked}|fwd_inner_muls={fwd_muls_per_call}|fwd_adds={fwd_adds_per_call}|inv_inner_muls={inv_muls_per_call}|inv_adds={inv_adds_per_call}|parseval=EXACT|roundtrip=EXACT|motor_block_strokes={strokes}|host8_rooms={ROOM_COUNT}|shards={}|float_used=0|json=0",
         ROOM_COUNT / ROOMS_PER_FILE
     );
+    print!("{group_rows}");
 }

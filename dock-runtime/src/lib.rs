@@ -60,6 +60,7 @@ pub fn inspect_command(command:&str)->Result<(),&'static str> {
             let n=arg.parse::<u64>().map_err(|_| "room_number")?;
             asolaria_unified_core::address(n).map(|_|())
         }
+        "group"=>asolaria_unified_core::group_start_room(arg).map(|_|()),
         "sha" if arg.len()%2==0 && arg.bytes().all(|b|b.is_ascii_hexdigit())=>Ok(()),
         "gnn"=> {
             let values:Vec<i64>=arg.split(',').map(|v|v.parse().map_err(|_|"feature_integer")).collect::<Result<_,_>>()?;
@@ -75,7 +76,7 @@ pub fn inspect_command(command:&str)->Result<(),&'static str> {
 fn local_task(config:&Config,command:&str)->Reply {
     if let Err(e)=inspect_command(command) {return error(400,e);}
     let verb=command.trim().split(' ').next().unwrap_or("");
-    let result=if matches!(verb,"room"|"memory") {
+    let result=if matches!(verb,"room"|"group"|"memory") {
         if config.rooms.is_none() {return error(503,"room_source_NOT_MEASURED");}
         asolaria_unified_core::native::with_rooms(|r| asolaria_unified_core::run(command,Some(r)))
     } else {asolaria_unified_core::run(command,None)};
@@ -86,6 +87,11 @@ fn room_number(query:&str)->Result<u64,&'static str> {
     if text.is_empty() || !text.bytes().all(|b|b.is_ascii_digit()) {return Err("room_number");}
     let n=text.parse::<u64>().map_err(|_|"room_number")?;
     asolaria_unified_core::address(n)?;Ok(n)
+}
+fn group_selector(query:&str)->Result<String,&'static str> {
+    let text=http::single_query(query,"g")?;
+    asolaria_unified_core::group_start_room(&text)?;
+    Ok(text)
 }
 fn peer_station(config:&Config)->Result<(Station,String),&'static str> {
     let body=http::fetch(config.peer,config.key.wire(),"/station.hbp")?;
@@ -129,6 +135,12 @@ fn route(config:&Config,request:http::Request)->Reply {
         },
         "/peer/room.hbp"=>match room_number(&request.query) {
             Ok(n)=>peer_task(config,&format!("room {n}")),Err(e)=>error(400,e),
+        },
+        "/memory/group.hbp"=>match group_selector(&request.query) {
+            Ok(g)=>local_task(config,&format!("group {g}")),Err(e)=>error(400,e),
+        },
+        "/peer/group.hbp"=>match group_selector(&request.query) {
+            Ok(g)=>peer_task(config,&format!("group {g}")),Err(e)=>error(400,e),
         },
         "/task.hbp"=>match http::single_query(&request.query,"cmd") {
             Ok(command)=>local_task(config,&command),Err(e)=>error(400,e),
@@ -184,7 +196,7 @@ mod tests {
     #[test]
     fn private_routes_require_the_exact_key() {
         let c=config(Station::Acer,"127.0.0.1:5091".parse().unwrap());
-        for path in ["/station.hbp","/dock.hbp","/task.hbp?cmd=status","/peer/room.hbp?n=0"] {
+        for path in ["/station.hbp","/dock.hbp","/task.hbp?cmd=status","/peer/room.hbp?n=0","/memory/group.hbp?g=omega"] {
             assert_eq!(route(&c,req(path,None)).status,401);
             assert_eq!(route(&c,req(path,Some(&"b".repeat(64)))).status,401);
         }
@@ -194,12 +206,15 @@ mod tests {
     }
     #[test]
     fn refuses_shell_paths_injection_and_invalid_math_before_peer_connect() {
-        for bad in ["execute whoami","run shell","roomaddr 1","room 12500000000","room -1","memory x","status|json=1","status\n","sha gg","gnn 0,0","prism 1,2"] {
+        for bad in ["execute whoami","run shell","roomaddr 1","room 12500000000","room -1","group 462962962","group -1","memory x","status|json=1","status\n","sha gg","gnn 0,0","prism 1,2"] {
             assert!(inspect_command(bad).is_err(),"{bad}");
         }
+        assert!(inspect_command("group 0").is_ok());
+        assert!(inspect_command("group omega").is_ok());
         let c=config(Station::Acer,"127.0.0.1:1".parse().unwrap());
         assert_eq!(peer_task(&c,"execute whoami").status,400);
         assert_eq!(local_task(&c,"room 0").status,503);
+        assert_eq!(local_task(&c,"group omega").status,503);
         assert!(station_rows(&c).contains("room_source=NOT_MEASURED"));
         assert_eq!(local_task(&c,"sha 616263").body,asolaria_unified_core::run("sha 616263",None).unwrap());
     }

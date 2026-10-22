@@ -1,5 +1,5 @@
-/target
-/target-linux
+target/
+target-linux/
 # secrets + local identity NEVER leave your machine
 *.key
 .asolaria/

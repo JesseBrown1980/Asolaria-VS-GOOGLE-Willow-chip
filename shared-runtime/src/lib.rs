@@ -23,6 +23,8 @@ include!(concat!(env!("OUT_DIR"), "/canonical_tribit.rs"));
 pub const ROOM_COUNT: u64 = 12_500_000_000;
 pub const ROOMS_PER_FILE: u64 = 100_000_000;
 pub const ROOM_BYTES: u64 = 8;
+pub const ROOMS_PER_GROUP: u64 = 27;
+pub const GROUP_COUNT: u64 = ROOM_COUNT / ROOMS_PER_GROUP;
 pub const HALF27: i128 = 3_812_798_742_493;
 pub const SEED: u64 = 0xca41_a49f_cda8_f634;
 pub const ABI: &str = "ASOLARIA-UNIFIED-HBP-V1";
@@ -125,6 +127,59 @@ pub fn room_row(reader: &mut dyn RoomRead, n: u64) -> Result<String, &'static st
         a.file_shard, a.offset, a.balanced, trits(a.word)?))
 }
 
+pub fn group_start_room(arg: &str) -> Result<(String, u64), &'static str> {
+    if arg == "omega" {
+        Ok((
+            String::from("omega"),
+            (ROOM_COUNT / 2) - (ROOMS_PER_GROUP / 2),
+        ))
+    } else {
+        if arg.is_empty() || !arg.bytes().all(|b| b.is_ascii_digit()) {
+            return Err("group_number");
+        }
+        let g = arg.parse::<u64>().map_err(|_| "group_number")?;
+        if g >= GROUP_COUNT {
+            return Err("group_out_of_range");
+        }
+        Ok((g.to_string(), g * ROOMS_PER_GROUP))
+    }
+}
+
+pub fn group_row(reader: &mut dyn RoomRead, arg: &str) -> Result<String, &'static str> {
+    let (label, start) = group_start_room(arg)?;
+    let mut lanes = [0u64; 27];
+    for (i, lane) in lanes.iter_mut().enumerate() {
+        let n = start + (i as u64);
+        let a = address(n)?;
+        let stub = u64::from_le_bytes(reader.read8(a.file_shard, a.offset)?);
+        if unmix(stub) ^ SEED != a.word {
+            return Err("room_identity_mismatch");
+        }
+        *lane = a.word % tribit::P;
+    }
+    let omega_addr = address(ROOM_COUNT / 2)?;
+    let omega_stub = u64::from_le_bytes(reader.read8(omega_addr.file_shard, omega_addr.offset)?);
+    if unmix(omega_stub) ^ SEED != omega_addr.word {
+        return Err("room_identity_mismatch");
+    }
+    let spectrum = tribit::prism(&lanes);
+    if tribit::unprism(&spectrum) != lanes {
+        return Err("prism_roundtrip");
+    }
+    let spec_text = spectrum
+        .iter()
+        .map(u64::to_string)
+        .collect::<Vec<_>>()
+        .join(",");
+    let spec_sha = digest(spec_text.as_bytes());
+    let end = start + ROOMS_PER_GROUP - 1;
+    Ok(format!(
+        "ROOMGROUP|group={label}|start_room={start}|end_room={end}|rooms=27|omega_per_ground=1|omega_room={}|omega_stub={omega_stub:016x}|dc_glyph={}|spectrum_sha256={spec_sha}|prism_roundtrip=EXACT|decode=EXACT|writes=0|process_per_room=0|float_used=0|json=0\n",
+        ROOM_COUNT / 2,
+        spectrum[0]
+    ))
+}
+
 pub fn status() -> String {
     format!("UNIFIEDCORE|abi={ABI}|implementation=CLASSICAL_REALIZATION_OF_UNIFICATION|physical_quantum_processor=0|physics_interpretation=operator_separate|rust=1.81|unit=balanced_trit|float_used=0|models=L0,L4|room_count={ROOM_COUNT}|room_bytes=8|file_shards=125|rooms_per_group=27|omega_per_ground=1|group_geometry=operator_contract_preserved|operator_sector_namespace=8_million_plus_separate|authority=observation_only|dispatch=0|json=0\n")
 }
@@ -139,6 +194,7 @@ pub fn known_command(line: &str) -> bool {
                 | "o"
                 | "roomaddr"
                 | "room"
+                | "group"
                 | "sha"
                 | "prism"
                 | "gnn"
@@ -164,13 +220,14 @@ pub fn run(line: &str, reader: Option<&mut dyn RoomRead>) -> Result<String, &'st
             row.push_str(&r.cache_row());
             Ok(row)
         },
-        "help" if arg.is_empty() => Ok(String::from("UNIFIEDHELP|commands=status;memory;omega;o;roomaddr_n;room_n;sha_hex;prism_27_lanes;gnn_12_Q24_features|writes=0|dispatch=0|json=0\n")),
+        "help" if arg.is_empty() => Ok(String::from("UNIFIEDHELP|commands=status;memory;omega;o;roomaddr_n;room_n;group_g;sha_hex;prism_27_lanes;gnn_12_Q24_features|writes=0|dispatch=0|json=0\n")),
         "roomaddr" => {
             let n = arg.parse::<u64>().map_err(|_| "room_number")?;
             let a = address(n)?;
             Ok(format!("ROOMADDRESS|room={n}|file_shard={}|offset={}|balanced={}|trits={}|room_bytes=8|storage_read=0|json=0\n", a.file_shard, a.offset, a.balanced, trits(a.word)?))
         },
         "room" => room_row(reader.ok_or("storage_adapter_not_attached")?, arg.parse().map_err(|_| "room_number")?),
+        "group" => group_row(reader.ok_or("storage_adapter_not_attached")?, arg),
         "sha" => {
             let bytes = unhex(arg)?;
             let sha = digest(&bytes);
@@ -212,6 +269,17 @@ mod tests {
             Ok(self.value)
         }
     }
+    struct ExactStore {
+        calls: usize,
+    }
+    impl RoomRead for ExactStore {
+        fn read8(&mut self, shard: u64, offset: u64) -> Result<[u8; 8], &'static str> {
+            self.calls += 1;
+            let n = shard * ROOMS_PER_FILE + offset / ROOM_BYTES;
+            let a = address(n)?;
+            Ok(mix(a.word ^ SEED).to_le_bytes())
+        }
+    }
     #[test]
     fn sha_known_answer() {
         assert_eq!(
@@ -241,6 +309,28 @@ mod tests {
         }
     }
     #[test]
+    fn group_27_rooms_and_omega_prism_roundtrip() {
+        let mut store = ExactStore { calls: 0 };
+        let g0 = run("group 0", Some(&mut store)).unwrap();
+        assert!(g0.starts_with("ROOMGROUP|group=0|start_room=0|end_room=26|rooms=27|omega_per_ground=1|omega_room=6250000000|"));
+        assert!(g0.contains("prism_roundtrip=EXACT|decode=EXACT|writes=0|process_per_room=0|float_used=0|json=0"));
+        assert_eq!(store.calls, 28);
+
+        let mut store_omega = ExactStore { calls: 0 };
+        let g_omega = run("group omega", Some(&mut store_omega)).unwrap();
+        assert!(g_omega.starts_with(
+            "ROOMGROUP|group=omega|start_room=6249999987|end_room=6250000013|rooms=27|omega_per_ground=1|omega_room=6250000000|"
+        ));
+        assert!(g_omega.contains("prism_roundtrip=EXACT|decode=EXACT"));
+        assert_eq!(store_omega.calls, 28);
+
+        assert_eq!(
+            group_row(&mut store_omega, &GROUP_COUNT.to_string()),
+            Err("group_out_of_range")
+        );
+        assert_eq!(group_row(&mut store_omega, "-1"), Err("group_number"));
+    }
+    #[test]
     fn out_of_range_does_not_read() {
         let mut r = Reader {
             calls: 0,
@@ -266,6 +356,8 @@ mod tests {
             "status\n",
             "sha zz",
             "room -1",
+            "group -1",
+            "group 462962962",
             "prism 1,2",
             "gnn 0,1",
             "execute anything",
