@@ -24,6 +24,10 @@ host8-native-mapping = { path = "../host8-native-mapping", optional = true }
 name = "mapped_identity_probe"
 required-features = ["std"]
 
+[[example]]
+name = "willow_room_bench"
+required-features = ["std"]
+
 [profile.release]
 opt-level = 3
 lto = true

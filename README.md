@@ -55,7 +55,7 @@ A tiny, self-contained **operating-system front-end** you build from source and 
 - **[`host8-native-mapping/`](host8-native-mapping/)** — Zero-dependency Win32 FFI (`CreateFileMappingW` / `MapViewOfFile`) read-only identity-plane mapping for the 100 GB / `12,500,000,000` 8-byte Host-8 room store (`125` sector files $\times$ `800,000,000` bytes).
 - **[`aether/model/l0-edge/`](aether/model/l0-edge/) & [`aether/model/l4-gslgnn/`](aether/model/l4-gslgnn/)** — Pure integer `Q24` fixed-point Graph Neural Network crates (`float_used = 0`) with complete `.hbp` golden vector test suites.
 - **[`dock-runtime/`](dock-runtime/) (`asolaria-native-dock`)** — Loopback-only HBP station federation over explicit ADB USB forward/reverse tunnels (`ACER` PC station on `127.0.0.1:5090` $\leftrightarrow$ `FALCON` ARM64 phone station on `127.0.0.1:5091`), providing authenticated read-only room & 27-room group RPC (`/peer/room.hbp?n=...`, `/peer/group.hbp?g=...`) and shared-core compute RPC (`/peer/task.hbp?cmd=...`).
-- **[`receipts/`](receipts/)** — Sealed `.hbp` + `.hbi` + `.sha256` verification receipts (`GROUP-PRISM-LIVE-20261022.hbp`, `PRISM-COST-CHECK-20261021.hbp`, `USB-VAULT-GAP-ACCOUNTING-20261021.hbp`, `REBOOT-CUTOVER-READINESS-20261021.hbp`, `DOCK-LIVE-20261021.hbp`, `PHONE-DOCK-AUDIT-20261021.hbp`, `MAPPED-ACTIVATION-20261021-RESULT.hbp`, `GITHUB-3D-VIEW.hbp`).
+- **[`receipts/`](receipts/)** — Sealed `.hbp` + `.hbi` + `.sha256` verification receipts (`WILLOW-ROOM-BENCH-20261022.hbp`, `GROUP-PRISM-LIVE-20261022.hbp`, `PRISM-COST-CHECK-20261021.hbp`, `USB-VAULT-GAP-ACCOUNTING-20261021.hbp`, `REBOOT-CUTOVER-READINESS-20261021.hbp`, `DOCK-LIVE-20261021.hbp`, `PHONE-DOCK-AUDIT-20261021.hbp`, `MAPPED-ACTIVATION-20261021-RESULT.hbp`, `GITHUB-3D-VIEW.hbp`).
 
 ---
 
@@ -86,6 +86,12 @@ PRISMCOSTCHECK|prime=1000081|generator=7|lanes=27|root=951846|vectors=127|fwd_in
 ROOMGROUP|group=0|start_room=0|end_room=26|rooms=27|omega_per_ground=1|omega_room=6250000000|omega_stub=c492fa3972e05ab3|dc_glyph=799891|spectrum_sha256=6af8aa6e5066e108d509c22aa8410b33e158c5dfe17e48cca0778074e30fb7df|prism_roundtrip=EXACT|decode=EXACT|writes=0|process_per_room=0|float_used=0|json=0
 ROOMGROUP|group=omega|start_room=6249999987|end_room=6250000013|rooms=27|omega_per_ground=1|omega_room=6250000000|omega_stub=c492fa3972e05ab3|dc_glyph=131843|spectrum_sha256=227b433ab89217ea6beeefe168fa6d05ba4b68187968415a10efa77ae8bda2a2|prism_roundtrip=EXACT|decode=EXACT|writes=0|process_per_room=0|float_used=0|json=0
 ```
+
+### 2b. Run the 5-Tier Willow-Class RCS/XEB & Surface-Code QEC Benchmark (`willow_room_bench`)
+```sh
+cargo +1.81.0 run --release --manifest-path shared-runtime/Cargo.toml --features std --example willow_room_bench
+```
+See **[`receipts/WILLOW-ROOM-BENCH-20261022.hbp`](receipts/WILLOW-ROOM-BENCH-20261022.hbp)** for the sealed 5-stage benchmark receipt across dense binary state-vector RAM ($2^{18}..2^{28}$ amplitudes), $O(1)$ procedural registers (`1.15B rooms/s`), a `3.2 GiB` physical RAM room arena (`887.56M rooms/s`), all `125` mapped room sectors (`100 GB` / `12.5B` rooms at `743.07M rooms/s` and `1,192` depth-40 105-lane circuits/s), $d=3,5,7$ Surface-Code QEC + Dual-GNN `Q24` decoding, and live `ACER` $\leftrightarrow$ `FALCON` USB dock federation.
 
 ### 3. Run the Full Node Installer (OS + Recall + 8-Byte Host)
 See **[FABRIC-NODE.md](FABRIC-NODE.md)** for full details:
