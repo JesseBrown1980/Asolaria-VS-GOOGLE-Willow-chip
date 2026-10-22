@@ -55,7 +55,7 @@ A tiny, self-contained **operating-system front-end** you build from source and 
 - **[`host8-native-mapping/`](host8-native-mapping/)** — Zero-dependency Win32 FFI (`CreateFileMappingW` / `MapViewOfFile`) read-only identity-plane mapping for the 100 GB / `12,500,000,000` 8-byte Host-8 room store (`125` sector files $\times$ `800,000,000` bytes).
 - **[`aether/model/l0-edge/`](aether/model/l0-edge/) & [`aether/model/l4-gslgnn/`](aether/model/l4-gslgnn/)** — Pure integer `Q24` fixed-point Graph Neural Network crates (`float_used = 0`) with complete `.hbp` golden vector test suites.
 - **[`dock-runtime/`](dock-runtime/) (`asolaria-native-dock`)** — Loopback-only HBP station federation over explicit ADB USB forward/reverse tunnels (`ACER` PC station on `127.0.0.1:5090` $\leftrightarrow$ `FALCON` ARM64 phone station on `127.0.0.1:5091`), providing authenticated read-only room & 27-room group RPC (`/peer/room.hbp?n=...`, `/peer/group.hbp?g=...`) and shared-core compute RPC (`/peer/task.hbp?cmd=...`).
-- **[`receipts/`](receipts/)** — Sealed `.hbp` + `.hbi` + `.sha256` verification receipts (`PRISM-COST-CHECK-20261021.hbp`, `USB-VAULT-GAP-ACCOUNTING-20261021.hbp`, `REBOOT-CUTOVER-READINESS-20261021.hbp`, `DOCK-LIVE-20261021.hbp`, `PHONE-DOCK-AUDIT-20261021.hbp`, `MAPPED-ACTIVATION-20261021-RESULT.hbp`, `GITHUB-3D-VIEW.hbp`).
+- **[`receipts/`](receipts/)** — Sealed `.hbp` + `.hbi` + `.sha256` verification receipts (`GROUP-PRISM-LIVE-20261022.hbp`, `PRISM-COST-CHECK-20261021.hbp`, `USB-VAULT-GAP-ACCOUNTING-20261021.hbp`, `REBOOT-CUTOVER-READINESS-20261021.hbp`, `DOCK-LIVE-20261021.hbp`, `PHONE-DOCK-AUDIT-20261021.hbp`, `MAPPED-ACTIVATION-20261021-RESULT.hbp`, `GITHUB-3D-VIEW.hbp`).
 
 ---
 
